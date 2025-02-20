@@ -26,12 +26,12 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error from Google OAuth:', error);
-      return NextResponse.redirect('http://localhost:3000?error=' + error);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?error=${error}`);
     }
 
     if (!code) {
       console.error('No authorization code received');
-      return NextResponse.redirect('http://localhost:3000?error=no_code');
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?error=no_code`);
     }
 
     console.log('Received authorization code, getting tokens');
@@ -50,10 +50,10 @@ export async function GET(request: Request) {
     global.googleTokens = tokens;
 
     // Redirect back to the main page
-    return NextResponse.redirect('http://localhost:3000?success=true');
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?success=true`);
   } catch (error) {
     console.error('Error in Google auth callback:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.redirect('http://localhost:3000?error=' + encodeURIComponent(errorMessage));
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?error=${encodeURIComponent(errorMessage)}`);
   }
 } 

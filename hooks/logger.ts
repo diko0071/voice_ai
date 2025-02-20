@@ -38,4 +38,8 @@ class Logger {
   }
 }
 
-export const logger = new Logger(); 
+// Create a singleton instance
+const logger = new Logger();
+
+// Export the instance instead of the class
+export { logger }; 

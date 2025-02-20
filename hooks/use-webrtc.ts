@@ -30,6 +30,13 @@ const useWebRTCAudioSession = (voice: string) => {
       session: {
         modalities: ['text', 'audio'],
         tools: [],
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 200,
+          create_response: true
+        },
         instructions: `You are AI Agent Improvado, a Senior Business Development Representative (BDR) for Improvado with advanced expertise in marketing analytics and data integration. Your role is to conduct discovery calls with potential clients following a structured approach.
 
 Personal Style:
@@ -39,6 +46,12 @@ Personal Style:
 - You use a consultative approach, focusing on understanding before presenting solutions
 - You're genuinely interested in helping clients solve their data challenges
 - You occasionally reference being an AI agent in a professional way, showing how technology can enhance business relationships
+
+IMPORTANT BEHAVIOR:
+- Start speaking immediately after connection is established
+- Do not wait for the user to speak first
+- Begin with your professional introduction
+- Proceed naturally with discovery questions
 
 1. Professional Introduction:
    "Hello! I'm AI Agent Improvado, a senior representative of Improvado - the leading marketing data integration platform. Thank you for taking the time to speak with me today. Our goal is to better understand your current marketing data processes and discuss how we can help optimize them. Would you mind if I ask you a few questions about your current situation?"
@@ -98,23 +111,57 @@ Personal Style:
    - Maintain a consultative approach
    - Don't rush to pitch - gather comprehensive information
    - Leverage your AI capabilities to provide precise, data-driven insights
+   - IMPORTANT: Start the conversation immediately after connection is established, don't wait for the user to speak first
 
 Remember: Your goal is to conduct a thorough discovery to understand the client's current situation, challenges, and needs. Don't move to solution presentation until you have clear insights about their pain points and business impact. Use your unique position as an AI agent to demonstrate how technology can enhance the discovery process while maintaining a warm, professional interaction.`
       }
     };
 
-    logger.log('Sending session update with instructions:', {
-      instructionsLength: sessionUpdate.session.instructions.length,
-      instructionsPreview: sessionUpdate.session.instructions.substring(0, 200) + '...',
-      sessionUpdateType: sessionUpdate.type
-    });
+    // Send messages in sequence with proper timing
+    const sendMessages = async () => {
+      try {
+        // 1. Send session update and wait
+        logger.log('Sending session update');
+        dataChannel.send(JSON.stringify(sessionUpdate));
+        
+        // Wait for a short time to ensure session update is processed
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-    try {
-      dataChannel.send(JSON.stringify(sessionUpdate));
-      logger.log('Session update sent successfully');
-    } catch (error) {
-      logger.error('Failed to send session update:', error);
-    }
+        // 2. Send conversation item if channel is still open
+        if (dataChannel.readyState === 'open') {
+          logger.log('Sending conversation item');
+          const startPrompt = {
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'user',
+              content: [{
+                type: 'input_text',
+                text: 'Begin the conversation by introducing yourself as an Improvado representative'
+              }]
+            }
+          };
+          dataChannel.send(JSON.stringify(startPrompt));
+
+          // Wait again before sending response.create
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // 3. Finally send response.create if channel is still open
+          if (dataChannel.readyState === 'open') {
+            logger.log('Triggering response creation');
+            const createResponse = {
+              type: 'response.create'
+            };
+            dataChannel.send(JSON.stringify(createResponse));
+          }
+        }
+      } catch (error) {
+        logger.error('Error sending messages:', error);
+      }
+    };
+
+    // Start the message sequence
+    sendMessages();
   };
  
   const handleDataChannelMessage = async (event: MessageEvent) => {
@@ -303,6 +350,7 @@ Remember: Your goal is to conduct a thorough discovery to understand the client'
       setIsSessionActive(true);
       setStatus("Session established successfully!");
       logger.log('Session established successfully');
+
     } catch (err) {
       logger.error('Error starting session:', err);
       setStatus(`Error: ${err}`);

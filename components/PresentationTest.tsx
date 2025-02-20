@@ -6,10 +6,16 @@ import useWebRTCAudioSession from '@/hooks/use-webrtc';
 
 const PRESENTATION_ID = process.env.GOOGLE_PRESENTATION_ID;
 
+interface SlideNote {
+  slideId: string;
+  notes: string;
+}
+
 export const PresentationTest = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [slideNotes, setSlideNotes] = useState<SlideNote[]>([]);
   
   const { 
     isSessionActive, 
@@ -79,7 +85,7 @@ export const PresentationTest = () => {
           });
 
           const slidesResponse = await fetch(
-            `https://slides.googleapis.com/v1/presentations/${PRESENTATION_ID}`,
+            `https://slides.googleapis.com/v1/presentations/${PRESENTATION_ID}?fields=slides(objectId,slideProperties/notesPage/notesProperties,slideProperties/notesPage/pageElements)`,
             {
               headers: {
                 'Authorization': `Bearer ${tokens.access_token}`,
@@ -101,14 +107,127 @@ export const PresentationTest = () => {
               }
             } else {
               const errorText = await slidesResponse.text();
+              logger.error('Slides API error', {
+                status: slidesResponse.status,
+                statusText: slidesResponse.statusText,
+                error: errorText
+              });
               throw new Error(`API request failed: ${slidesResponse.status} - ${errorText}`);
             }
           }
 
           const slidesData = await slidesResponse.json();
           logger.log('Google Slides API response received', {
-            dataPreview: JSON.stringify(slidesData).substring(0, 200) + '...'
+            fullResponse: slidesData,
+            slidesCount: slidesData.slides?.length
           });
+
+          // Fetch notes for each slide
+          const notes: SlideNote[] = [];
+          if (slidesData.slides) {
+            logger.log('Processing slides', { 
+              count: slidesData.slides.length,
+              firstSlide: slidesData.slides[0]
+            });
+            
+            for (const slide of slidesData.slides) {
+              logger.log('Processing slide', { 
+                objectId: slide.objectId,
+                slideProperties: slide.slideProperties,
+                hasNotesPage: !!slide.slideProperties?.notesPage,
+                notesPageId: slide.slideProperties?.notesPage?.notesPageId,
+                fullSlide: slide
+              });
+
+              // Try to get notes directly from the slide data first
+              if (slide.slideProperties?.notesPage?.pageElements) {
+                const noteElements = slide.slideProperties.notesPage.pageElements;
+                logger.log('Found note elements in slide data', { noteElements });
+                
+                for (const element of noteElements) {
+                  if (element.shape?.text?.textElements) {
+                    const textContent = element.shape.text.textElements
+                      .map((textElement: any) => textElement.textRun?.content || '')
+                      .join('');
+                    
+                    if (textContent.trim()) {
+                      logger.log('Found note text directly in slide', { 
+                        slideId: slide.objectId, 
+                        textContent 
+                      });
+                      notes.push({
+                        slideId: slide.objectId,
+                        notes: textContent.trim()
+                      });
+                      break; // Found the notes, no need to check other elements
+                    }
+                  }
+                }
+              }
+              
+              // If no notes found in slide data, try fetching them separately
+              if (!notes.find(note => note.slideId === slide.objectId) && 
+                  slide.slideProperties?.notesPage?.notesPageId) {
+                const notesPageId = slide.slideProperties.notesPage.notesPageId;
+                logger.log('Fetching notes for slide', { notesPageId });
+                
+                const notesResponse = await fetch(
+                  `https://slides.googleapis.com/v1/presentations/${PRESENTATION_ID}/pages/${notesPageId}`,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${tokens.access_token}`,
+                      'Content-Type': 'application/json',
+                    }
+                  }
+                );
+
+                if (notesResponse.ok) {
+                  const notesData = await notesResponse.json();
+                  logger.log('Notes data received', { 
+                    hasNotesProperties: !!notesData.notesProperties,
+                    speakerNotesId: notesData.notesProperties?.speakerNotesObjectId,
+                    pageElementsCount: notesData.pageElements?.length
+                  });
+                  
+                  const speakerNotesId = notesData.notesProperties?.speakerNotesObjectId;
+                  
+                  if (speakerNotesId) {
+                    // Find the text content in page elements
+                    const noteElement = notesData.pageElements?.find(
+                      (element: any) => element.objectId === speakerNotesId
+                    );
+                    
+                    logger.log('Found note element', {
+                      found: !!noteElement,
+                      hasShape: !!noteElement?.shape,
+                      hasText: !!noteElement?.shape?.text,
+                      textElements: noteElement?.shape?.text?.textElements?.length
+                    });
+
+                    const textContent = noteElement?.shape?.text?.textElements
+                      ?.map((element: any) => element.textRun?.content || '')
+                      .join('') || '';
+
+                    if (textContent.trim()) {
+                      logger.log('Adding note', { slideId: slide.objectId, textContent });
+                      notes.push({
+                        slideId: slide.objectId,
+                        notes: textContent.trim()
+                      });
+                    }
+                  }
+                } else {
+                  logger.error('Failed to fetch notes', {
+                    status: notesResponse.status,
+                    statusText: notesResponse.statusText
+                  });
+                }
+              }
+            }
+          }
+
+          logger.log('Final notes array', { notes, count: notes.length });
+          setSlideNotes(notes);
           setIsLoading(false);
           return;
         }
@@ -200,6 +319,17 @@ export const PresentationTest = () => {
               allowFullScreen
             />
           </div>
+          {slideNotes.length > 0 && (
+            <div className="p-4 bg-gray-50 border-t border-gray-200">
+              <h3 className="text-lg font-semibold mb-2">Speaker Notes:</h3>
+              {slideNotes.map((note, index) => (
+                <div key={note.slideId} className="mb-4">
+                  <p className="font-medium">Slide {index + 1}:</p>
+                  <p className="whitespace-pre-wrap text-gray-600">{note.notes}</p>
+                </div>
+              ))}
+            </div>
+          )}
           {voiceStatus && (
             <div className="p-4 bg-gray-50 border-t border-gray-200">
               <p className="text-gray-600">{voiceStatus}</p>

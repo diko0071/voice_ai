@@ -26,6 +26,7 @@ export const PresentationTest = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const errorParam = urlParams.get('error');
     const successParam = urlParams.get('success');
+    const tokensParam = urlParams.get('tokens');
 
     if (errorParam) {
       setError(decodeURIComponent(errorParam));
@@ -35,16 +36,84 @@ export const PresentationTest = () => {
       return;
     }
 
-    if (successParam) {
-      // Clear the URL parameters and proceed with token retrieval
-      window.history.replaceState({}, '', window.location.pathname);
+    if (successParam && tokensParam) {
+      try {
+        // Store tokens in localStorage
+        const tokens = JSON.parse(decodeURIComponent(tokensParam));
+        localStorage.setItem('googleTokens', JSON.stringify(tokens));
+        // Clear the URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (err) {
+        console.error('Error storing tokens:', err);
+        setError('Failed to store authentication tokens');
+        setIsLoading(false);
+        return;
+      }
     }
 
     const testGoogleAPI = async () => {
       try {
         logger.log('Starting Google Slides API test');
         
-        // Get access token
+        // Check if we have stored tokens
+        const storedTokens = localStorage.getItem('googleTokens');
+        if (storedTokens) {
+          const tokens = JSON.parse(storedTokens);
+          const currentTime = Date.now();
+          
+          // If tokens are expired, clear them and restart auth
+          if (tokens.expiry_date && currentTime >= tokens.expiry_date) {
+            localStorage.removeItem('googleTokens');
+            const response = await fetch('/api/google/auth', { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to refresh auth');
+            const data = await response.json();
+            if (data.auth_url) {
+              window.location.href = data.auth_url;
+              return;
+            }
+          }
+          
+          // Use stored access token
+          logger.log('Testing Google Slides API connection', {
+            presentationId: PRESENTATION_ID,
+          });
+
+          const slidesResponse = await fetch(
+            `https://slides.googleapis.com/v1/presentations/${PRESENTATION_ID}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          );
+          
+          if (!slidesResponse.ok) {
+            // If token is invalid, clear it and restart auth
+            if (slidesResponse.status === 401) {
+              localStorage.removeItem('googleTokens');
+              const response = await fetch('/api/google/auth', { method: 'POST' });
+              if (!response.ok) throw new Error('Failed to refresh auth');
+              const data = await response.json();
+              if (data.auth_url) {
+                window.location.href = data.auth_url;
+                return;
+              }
+            } else {
+              const errorText = await slidesResponse.text();
+              throw new Error(`API request failed: ${slidesResponse.status} - ${errorText}`);
+            }
+          }
+
+          const slidesData = await slidesResponse.json();
+          logger.log('Google Slides API response received', {
+            dataPreview: JSON.stringify(slidesData).substring(0, 200) + '...'
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // If no stored tokens, start auth process
         const response = await fetch('/api/google/auth', {
           method: 'POST',
         });
@@ -60,42 +129,6 @@ export const PresentationTest = () => {
           logger.log('Redirecting to Google auth');
           window.location.href = data.auth_url;
           return;
-        }
-
-        // If we got an access token, use it
-        if (data.access_token) {
-          setAccessToken(data.access_token);
-          
-          logger.log('Testing Google Slides API connection', {
-            presentationId: PRESENTATION_ID,
-          });
-
-          const slidesResponse = await fetch(
-            `https://slides.googleapis.com/v1/presentations/${PRESENTATION_ID}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${data.access_token}`,
-                'Content-Type': 'application/json',
-              }
-            }
-          );
-          
-          if (!slidesResponse.ok) {
-            const errorText = await slidesResponse.text();
-            logger.error('Google Slides API request failed', {
-              status: slidesResponse.status,
-              statusText: slidesResponse.statusText,
-              errorText,
-              headers: Object.fromEntries(slidesResponse.headers.entries())
-            });
-            throw new Error(`API request failed: ${slidesResponse.status} - ${errorText}`);
-          }
-
-          const slidesData = await slidesResponse.json();
-          logger.log('Google Slides API response received', {
-            dataPreview: JSON.stringify(slidesData).substring(0, 200) + '...'
-          });
-          setIsLoading(false);
         }
       } catch (err: any) {
         logger.error('Error testing Google API:', {

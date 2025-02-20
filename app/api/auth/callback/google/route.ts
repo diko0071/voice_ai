@@ -46,11 +46,17 @@ export async function GET(request: Request) {
       expiryDate: tokens.expiry_date
     });
 
-    // Store tokens
+    // Store tokens in global for server-side use
     global.googleTokens = tokens;
 
-    // Redirect back to the main page
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?success=true`);
+    // Redirect back with tokens that will be stored in localStorage
+    const tokenData = encodeURIComponent(JSON.stringify({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date: tokens.expiry_date
+    }));
+    
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}?success=true&tokens=${tokenData}`);
   } catch (error) {
     console.error('Error in Google auth callback:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -12,7 +12,7 @@ How does that impact your goals like what are the goals for the company?
 
 You want the lowest cost per conversion possible.
 See what’s performing well and pull back on what's not.
-"
+"  
 		
 2. Many hours spent manually pulling reporting	"What level of data is being pulled?  
 How often are you putting this report together? 

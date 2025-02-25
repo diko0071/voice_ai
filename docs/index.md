@@ -2,6 +2,7 @@
 
 [ ] Remove presentation page
 [ ] Check first phrase interaption
+[ ] Move to organization provate repo
 [ ] Add final popup somehow
 [ ] Imbed to the website
     URL for improvado discovery call

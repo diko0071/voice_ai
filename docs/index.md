@@ -7,10 +7,9 @@ Run any version of this service to the website.
 ## Tasks
 
 [x] Remove presentation page
-[ ] Dialogs save (?to clickhouse) for analysis
-[ ] Change script and success createria
 [ ] Cleanup script bdr_scipt.md
-[ ] Check first phrase interaption
+[ ] Dialogs save (?to clickhouse) for analysis
+[ ] Change script and success createria based on new dacs from Daniel
 [ ] Move to organization provate repo
 [ ] Add final popup somehow
 [ ] Imbed to the website

@@ -7,7 +7,8 @@ Run any version of this service to the website.
 ## Tasks
 
 [x] Remove presentation page
-[ ] Cleanup script bdr_scipt.md
+[x] Cleanup script bdr_scipt.md
+[x] Move agent instructions to prompts directory
 [ ] Dialogs save (?to clickhouse) for analysis
 [ ] Change script and success createria based on new dacs from Daniel
 [ ] Move to organization provate repo

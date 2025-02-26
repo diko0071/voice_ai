@@ -6,8 +6,8 @@ Run any version of this service to the website.
 
 ## Tasks
 
-[ ] Remove presentation page
-[ ] Save (?to clickhouse)
+[x] Remove presentation page
+[ ] Dialogs save (?to clickhouse) for analysis
 [ ] Change script and success createria
 [ ] Cleanup script bdr_scipt.md
 [ ] Check first phrase interaption

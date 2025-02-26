@@ -1,46 +1,35 @@
-# Voice AI: Google Slides Voice Control
+# Voice AI: Voice Control Assistant
 
 ## Overview
-Next.js app integrating Google Slides with voice commands via WebRTC and OpenAI.
+Next.js app with voice commands via WebRTC and OpenAI.
 
 ## Structure
 - `app/` - Next.js App Router code
-  - `page.tsx` - Entry point, renders PresentationTest
+  - `page.tsx` - Entry point, renders ChatGPT component
   - `layout.tsx` - Root layout
   - `globals.css` - Global styles
   - `chatgpt.tsx` - OpenAI voice processing
   - `api/` - Backend endpoints
-    - `google/` - Slides API integration
-    - `auth/` - Google OAuth
     - `log/` - Application logging
-- `components/` - React components
-  - `PresentationTest.tsx` - Main component for Slides integration
 - `hooks/` - Custom React hooks
   - `use-webrtc.ts` - Voice capture via WebRTC
   - `logger.ts` - Logging utilities
 - `public/` - Static assets
 - `.env.local` - Environment variables
   - `NEXT_PUBLIC_OPENAI_API_KEY` - OpenAI API key
-  - `NEXT_PUBLIC_APP_URL` - OAuth callback URL
-  - `GOOGLE_CLIENT_ID` - Google OAuth client ID
-  - `GOOGLE_CLIENT_SECRET` - Google OAuth secret
-  - `GOOGLE_PRESENTATION_ID` - Target Slides presentation
 - `next.config.ts` - Next.js config
 - `package.json` - Dependencies
 - `tailwind.config.ts` - Styling config
 - `tsconfig.json` - TypeScript config
 
 ## Flow
-1. `page.tsx` → `PresentationTest` component
-2. Google auth → Slides access
-3. WebRTC captures voice
-4. ChatGPT processes commands
-5. Commands control Slides presentation
+1. `page.tsx` → `ChatGPT` component
+2. WebRTC captures voice
+3. ChatGPT processes commands
+4. Voice assistant responds to user
 
 ## Setup
 1. Create `.env.local` from example
-2. Configure Google OAuth
-3. Set presentation ID
-4. Add OpenAI API key
-5. Run `npm run dev`
-6. Open http://localhost:3000 
+2. Add OpenAI API key
+3. Run `npm run dev`
+4. Open http://localhost:3000 

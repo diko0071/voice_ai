@@ -2,128 +2,154 @@
  * Session management utilities
  */
 
-import { logger } from '@/hooks/logger';
+import { logger } from '@/lib/logger';
 
-// In-memory session storage
-// In a production environment, this should be replaced with a proper database
 interface Session {
-  id: string;
+  sessionId: string;
   clientId: string;
-  createdAt: Date;
-  lastActiveAt: Date;
-  data: Record<string, any>;
+  createdAt: number;
+  lastActive: number;
 }
 
-// Session storage
+// In-memory session store
 const sessions: Record<string, Session> = {};
 
-// Session expiry time in minutes (default: 30 minutes)
-const SESSION_EXPIRY_MINUTES = parseInt(process.env.SESSION_EXPIRY_MINUTES || '30', 10);
+// Session expiry time in milliseconds (30 minutes by default)
+const SESSION_EXPIRY_MS = parseInt(process.env.SESSION_EXPIRY_MINUTES || '60') * 60 * 1000;
 
 /**
- * Creates a new session
- * @param sessionId The session ID
- * @param clientId The client ID
- * @param data Additional session data
- * @returns The created session
+ * Generate a random session ID
  */
-export function createSession(sessionId: string, clientId: string, data: Record<string, any> = {}): Session {
-  const now = new Date();
+function generateSessionId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 20; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Create a new session
+ */
+export function createSession(clientId: string): Session {
+  // Generate a unique session ID
+  let sessionId = generateSessionId();
+  
+  // Ensure the session ID is unique
+  while (sessions[sessionId]) {
+    sessionId = generateSessionId();
+  }
+  
+  // Create the session
+  const now = Date.now();
   const session: Session = {
-    id: sessionId,
+    sessionId,
     clientId,
     createdAt: now,
-    lastActiveAt: now,
-    data
+    lastActive: now
   };
   
+  // Store the session
   sessions[sessionId] = session;
+  
   logger.log('Session created', { sessionId, clientId });
+  console.log('Session created', { sessionId, clientId });
   
   return session;
 }
 
 /**
- * Gets a session by ID
- * @param sessionId The session ID
- * @returns The session, or null if not found
+ * Get a session by ID
  */
 export function getSession(sessionId: string): Session | null {
   const session = sessions[sessionId];
   
   if (!session) {
+    logger.log('Session not found', { sessionId });
+    console.log('Session not found', { sessionId });
     return null;
   }
   
   // Check if the session has expired
-  const now = new Date();
-  const expiryTime = new Date(session.lastActiveAt);
-  expiryTime.setMinutes(expiryTime.getMinutes() + SESSION_EXPIRY_MINUTES);
-  
-  if (now > expiryTime) {
-    // Session has expired
+  const now = Date.now();
+  if (now - session.lastActive > SESSION_EXPIRY_MS) {
+    // Session has expired, delete it
     deleteSession(sessionId);
+    logger.log('Session expired', { sessionId });
+    console.log('Session expired', { sessionId });
     return null;
   }
   
   // Update last active time
-  session.lastActiveAt = now;
+  session.lastActive = now;
+  
+  logger.log('Session retrieved', { sessionId, clientId: session.clientId });
+  console.log('Session retrieved', { sessionId, clientId: session.clientId });
   
   return session;
 }
 
 /**
- * Updates a session
- * @param sessionId The session ID
- * @param data The data to update
- * @returns The updated session, or null if not found
- */
-export function updateSession(sessionId: string, data: Record<string, any>): Session | null {
-  const session = getSession(sessionId);
-  
-  if (!session) {
-    return null;
-  }
-  
-  // Update session data
-  session.data = { ...session.data, ...data };
-  
-  return session;
-}
-
-/**
- * Deletes a session
- * @param sessionId The session ID
- * @returns Whether the session was deleted
+ * Delete a session
  */
 export function deleteSession(sessionId: string): boolean {
-  if (sessions[sessionId]) {
-    delete sessions[sessionId];
-    logger.log('Session deleted', { sessionId });
-    return true;
+  if (!sessions[sessionId]) {
+    return false;
   }
   
-  return false;
+  const clientId = sessions[sessionId].clientId;
+  
+  // Delete the session
+  delete sessions[sessionId];
+  
+  logger.log('Session deleted', { sessionId, clientId });
+  console.log('Session deleted', { sessionId, clientId });
+  
+  return true;
 }
 
 /**
- * Cleans up expired sessions
+ * Clean up expired sessions
  */
 export function cleanupExpiredSessions(): void {
-  const now = new Date();
+  const now = Date.now();
+  let expiredCount = 0;
   
   Object.keys(sessions).forEach(sessionId => {
     const session = sessions[sessionId];
-    const expiryTime = new Date(session.lastActiveAt);
-    expiryTime.setMinutes(expiryTime.getMinutes() + SESSION_EXPIRY_MINUTES);
-    
-    if (now > expiryTime) {
+    if (now - session.lastActive > SESSION_EXPIRY_MS) {
       deleteSession(sessionId);
+      expiredCount++;
     }
   });
+  
+  if (expiredCount > 0) {
+    logger.log('Expired sessions cleaned up', { count: expiredCount });
+    console.log('Expired sessions cleaned up', { count: expiredCount });
+  }
 }
 
-// Run session cleanup every 5 minutes
-if (typeof window === 'undefined') {
-  setInterval(cleanupExpiredSessions, 5 * 60 * 1000);
-} 
+/**
+ * Check if a session exists
+ */
+export function sessionExists(sessionId: string): boolean {
+  return !!sessions[sessionId];
+}
+
+/**
+ * Get all active sessions
+ */
+export function getAllSessions(): Session[] {
+  return Object.values(sessions);
+}
+
+/**
+ * Get session count
+ */
+export function getSessionCount(): number {
+  return Object.keys(sessions).length;
+}
+
+// Clean up expired sessions every 5 minutes
+setInterval(cleanupExpiredSessions, 5 * 60 * 1000); 

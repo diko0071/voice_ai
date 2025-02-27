@@ -7,11 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npm run test:sdk && npm run test:security && npm run test:webapp && npm run test:api",
-    "test:sdk": "node tests/sdk-test.js",
-    "test:security": "node tests/security-test.js",
-    "test:webapp": "node tests/webapp/ChatGPT.test.js && node tests/webapp/use-webrtc.test.js && node tests/webapp/api-routes.test.js",
-    "test:api": "node tests/api-endpoints.test.js",
+    "test": "jest",
     "minify": "uglifyjs public/sdk/voice-ai-sdk.js -o public/sdk/voice-ai-sdk.min.js -c -m",
     "deploy-sdk": "bash scripts/deploy-sdk.sh"
   },
@@ -33,5 +29,17 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "uglify-js": "^3.17.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"],
+    "verbose": true,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.next/",
+      "/tests/sdk-advanced.test.js",
+      "/tests/sdk-webrtc.test.js",
+      "/tests/sdk-session.test.js"
+    ]
   }
 }

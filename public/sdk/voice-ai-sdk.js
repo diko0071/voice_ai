@@ -35,6 +35,7 @@
         this.messages = [];
         this.ui = null;
         this.mode = 'idle';
+        this.sessionValidationInProgress = false;
         
         // Validate required configuration
         if (!this.clientId) {
@@ -53,7 +54,7 @@
       async _init() {
         try {
           // Load session from localStorage
-          this._loadSession();
+          await this._loadSession();
           
           // Validate client
           await this._validateClient();
@@ -82,20 +83,66 @@
       }
   
       /**
-       * Load session from localStorage
+       * Load session from localStorage and validate it
        * @private
        */
-      _loadSession() {
+      async _loadSession() {
         try {
           const savedSession = localStorage.getItem('voice_ai_session');
           if (savedSession) {
             const session = JSON.parse(savedSession);
             if (session.clientId === this.clientId) {
-              this.sessionId = session.sessionId;
+              console.log('Voice AI SDK: Found saved session', session.sessionId);
+              
+              // Проверяем валидность сессии перед использованием
+              if (await this._validateSession(session.sessionId)) {
+                this.sessionId = session.sessionId;
+                console.log('Voice AI SDK: Session validated successfully', this.sessionId);
+              } else {
+                console.log('Voice AI SDK: Saved session is invalid, will create a new one');
+                localStorage.removeItem('voice_ai_session');
+                this.sessionId = null;
+              }
+            } else {
+              console.log('Voice AI SDK: Saved session belongs to different client, will create a new one');
+              localStorage.removeItem('voice_ai_session');
             }
+          } else {
+            console.log('Voice AI SDK: No saved session found');
           }
         } catch (error) {
           console.error('Voice AI SDK: Failed to load session', error);
+          localStorage.removeItem('voice_ai_session');
+          this.sessionId = null;
+        }
+      }
+  
+      /**
+       * Validate if a session exists on the server
+       * @private
+       * @param {string} sessionId - The session ID to validate
+       * @returns {Promise<boolean>} - Whether the session is valid
+       */
+      async _validateSession(sessionId) {
+        if (this.sessionValidationInProgress) {
+          console.log('Voice AI SDK: Session validation already in progress');
+          return false;
+        }
+        
+        this.sessionValidationInProgress = true;
+        
+        try {
+          console.log('Voice AI SDK: Validating session', sessionId);
+          const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${sessionId}`, {
+            method: 'GET'
+          });
+          
+          this.sessionValidationInProgress = false;
+          return response.ok;
+        } catch (error) {
+          console.error('Voice AI SDK: Session validation failed', error);
+          this.sessionValidationInProgress = false;
+          return false;
         }
       }
   
@@ -109,6 +156,7 @@
             clientId: this.clientId,
             sessionId: this.sessionId
           }));
+          console.log('Voice AI SDK: Session saved to localStorage', this.sessionId);
         } catch (error) {
           console.error('Voice AI SDK: Failed to save session', error);
         }
@@ -135,6 +183,8 @@
           if (!response.ok || !data.valid) {
             throw new Error(data.error || 'Client validation failed');
           }
+          
+          console.log('Voice AI SDK: Client validated successfully');
         } catch (error) {
           console.error('Voice AI SDK: Client validation failed', error);
           throw error;
@@ -149,6 +199,7 @@
         try {
           if (!this.sessionId) {
             // Create a new session
+            console.log('Voice AI SDK: Creating new session');
             const response = await fetch(`${this.config.serverUrl}/api/v1/sessions`, {
               method: 'POST',
               headers: {
@@ -166,44 +217,14 @@
             }
             
             this.sessionId = data.sessionId;
+            console.log('Voice AI SDK: New session created', this.sessionId);
             this._saveSession();
           } else {
-            // Validate existing session
-            const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${this.sessionId}`, {
-              method: 'GET'
-            });
-            
-            if (!response.ok) {
-              // Session not found or expired, create a new one
-              return this._initSession();
-            }
+            console.log('Voice AI SDK: Using existing session', this.sessionId);
           }
         } catch (error) {
           console.error('Voice AI SDK: Session initialization failed', error);
           throw error;
-        }
-      }
-  
-      /**
-       * Fetch agent instructions from server
-       * @private
-       */
-      async _fetchInstructions() {
-        try {
-          const response = await fetch(`${this.config.serverUrl}/api/v1/instructions?clientId=${this.clientId}`, {
-            method: 'GET'
-          });
-          
-          if (!response.ok) {
-            console.warn('Voice AI SDK: Failed to fetch instructions, using default');
-            return this.config.instructions || 'You are a helpful voice assistant.';
-          }
-          
-          const data = await response.json();
-          return data.instructions;
-        } catch (error) {
-          console.error('Voice AI SDK: Failed to fetch instructions', error);
-          return this.config.instructions || 'You are a helpful voice assistant.';
         }
       }
   
@@ -335,175 +356,632 @@
        * @private
        * @param {string} mode - The mode to set
        */
-      _updateUI(mode) {
+      _updateUI(mode, volume = 0) {
+        // Store current UI mode
+        this.uiMode = mode;
+        
         if (!this.ui) return;
         
-        this.mode = mode;
+        const button = this.ui.button;
+        const buttonContainer = this.ui.animationContainer;
+        const statusText = this.ui.container.querySelector('.voice-ai-status');
         
-        // Clear animation container
-        while (this.ui.animationContainer.firstChild) {
-          this.ui.animationContainer.removeChild(this.ui.animationContainer.firstChild);
-        }
+        if (!button || !buttonContainer) return;
         
+        // Reset all classes
+        button.classList.remove(
+          'voice-ai-active',
+          'voice-ai-thinking',
+          'voice-ai-responding',
+          'voice-ai-error'
+        );
+        
+        // Update UI based on mode
         switch (mode) {
-          case 'idle':
-            // Add idle animation (circle)
-            const idleAnimation = document.createElement('div');
-            idleAnimation.className = 'voice-ai-idle-animation';
-            idleAnimation.style.width = '32px';
-            idleAnimation.style.height = '32px';
-            idleAnimation.style.borderRadius = '50%';
-            idleAnimation.style.backgroundColor = '#ffffff';
-            idleAnimation.style.opacity = '0.8';
-            idleAnimation.style.animation = 'voice-ai-pulse 2s infinite';
-            this.ui.animationContainer.appendChild(idleAnimation);
-            this.ui.idleAnimation = idleAnimation;
+          case 'active':
+            button.classList.add('voice-ai-active');
+            if (statusText) statusText.textContent = 'Listening...';
             break;
             
           case 'thinking':
-            // Add thinking animation (rotating circle)
-            const thinkingAnimation = document.createElement('div');
-            thinkingAnimation.className = 'voice-ai-thinking-animation';
-            thinkingAnimation.style.width = '32px';
-            thinkingAnimation.style.height = '32px';
-            thinkingAnimation.style.borderRadius = '50%';
-            thinkingAnimation.style.border = '3px solid #ffffff';
-            thinkingAnimation.style.borderTopColor = 'transparent';
-            thinkingAnimation.style.animation = 'voice-ai-thinking 1s infinite linear';
-            this.ui.animationContainer.appendChild(thinkingAnimation);
+            button.classList.add('voice-ai-thinking');
+            if (statusText) statusText.textContent = 'Thinking...';
             break;
             
           case 'responding':
-            // Add responding animation (brain icon)
-            const respondingAnimation = document.createElement('div');
-            respondingAnimation.className = 'voice-ai-responding-animation';
-            respondingAnimation.style.width = '32px';
-            respondingAnimation.style.height = '32px';
-            respondingAnimation.style.backgroundImage = "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"white\"><path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z\"/></svg>')";
-            respondingAnimation.style.backgroundSize = 'contain';
-            respondingAnimation.style.backgroundRepeat = 'no-repeat';
-            respondingAnimation.style.animation = 'voice-ai-pulse 2s infinite';
-            this.ui.animationContainer.appendChild(respondingAnimation);
+            button.classList.add('voice-ai-responding');
+            if (statusText) statusText.textContent = 'Responding...';
+            break;
+            
+          case 'error':
+            button.classList.add('voice-ai-error');
+            if (statusText) statusText.textContent = 'Error';
             break;
             
           case 'volume':
-            // Add volume animation (equalizer bars)
-            const volumeContainer = document.createElement('div');
-            volumeContainer.className = 'voice-ai-volume-container';
-            volumeContainer.style.display = 'flex';
-            volumeContainer.style.alignItems = 'center';
-            volumeContainer.style.justifyContent = 'center';
-            volumeContainer.style.gap = '3px';
-            volumeContainer.style.height = '32px';
+            button.classList.add('voice-ai-active');
+            if (statusText) statusText.textContent = 'Listening...';
             
-            for (let i = 0; i < 4; i++) {
-              const bar = document.createElement('div');
-              bar.className = 'voice-ai-volume-bar';
-              bar.style.width = '4px';
-              bar.style.height = `${10 + Math.random() * 20}px`;
-              bar.style.backgroundColor = '#ffffff';
-              bar.style.borderRadius = '2px';
-              bar.style.animation = `voice-ai-volume ${0.5 + Math.random() * 0.5}s infinite`;
-              bar.style.animationDelay = `${i * 0.1}s`;
-              volumeContainer.appendChild(bar);
+            // Handle volume visualization
+            let volumeIndicator = this.ui.animationContainer.querySelector('.voice-ai-volume-indicator');
+            
+            if (!volumeIndicator) {
+              // Create volume visualization if it doesn't exist
+              volumeIndicator = document.createElement('div');
+              volumeIndicator.className = 'voice-ai-volume-indicator';
+              volumeIndicator.style.display = 'flex';
+              volumeIndicator.style.justifyContent = 'center';
+              volumeIndicator.style.alignItems = 'flex-end';
+              volumeIndicator.style.height = '50px';
+              volumeIndicator.style.gap = '5px';
+              volumeIndicator.style.position = 'absolute';
+              volumeIndicator.style.bottom = '80px';
+              volumeIndicator.style.left = '50%';
+              volumeIndicator.style.transform = 'translateX(-50%)';
+              
+              // Create volume bars
+              for (let i = 0; i < 4; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'voice-ai-volume-bar';
+                bar.style.width = '4px';
+                bar.style.backgroundColor = '#3b82f6';
+                bar.style.borderRadius = '2px';
+                bar.style.height = '10px';
+                bar.style.transition = 'height 0.1s ease';
+                volumeIndicator.appendChild(bar);
+              }
+              
+              // Add to container
+              buttonContainer.appendChild(volumeIndicator);
             }
             
-            this.ui.animationContainer.appendChild(volumeContainer);
+            // Update volume bars
+            const bars = volumeIndicator.querySelectorAll('.voice-ai-volume-bar');
+            bars.forEach(bar => {
+              // Randomize heights slightly for visual effect
+              const randomFactor = 0.8 + Math.random() * 0.4;
+              const height = Math.max(10, Math.min(50, volume * 500 * randomFactor));
+              bar.style.height = `${height}px`;
+            });
+            
+            volumeIndicator.style.display = 'flex';
+            break;
+            
+          case 'inactive':
+          case 'idle':
+          default:
+            if (statusText) statusText.textContent = 'Click to talk';
+            
+            // Hide volume indicator if it exists
+            const volIndicator = this.ui.animationContainer.querySelector('.voice-ai-volume-indicator');
+            if (volIndicator) {
+              volIndicator.style.display = 'none';
+            }
             break;
         }
       }
   
       /**
-       * Get ephemeral token for OpenAI
+       * Configure the WebRTC session
        * @private
-       * @returns {Promise<string>} The ephemeral token
        */
-      async _getEphemeralToken() {
+      async _configureSession() {
         try {
-          const response = await fetch(`${this.config.serverUrl}/api/v1/voice/token`, {
+          console.log('Voice AI SDK: Configuring session with ID:', this.sessionId);
+          
+          // Create offer
+          const offer = await this.peerConnection.createOffer();
+          await this.peerConnection.setLocalDescription(offer);
+          
+          // Send offer to our server
+          const response = await fetch(`${this.config.serverUrl}/api/v1/voice/process`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               clientId: this.clientId,
-              sessionId: this.sessionId
+              sessionId: this.sessionId,
+              offer: this.peerConnection.localDescription,
+              voice: this.config.voice || 'alloy'
             })
           });
           
           const data = await response.json();
           
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to get ephemeral token');
+            const errorMessage = data.error || 'Failed to configure session';
+            
+            // Если сервер вернул новый ID сессии, используем его
+            if (response.status === 404 && data.newSessionId) {
+              console.log('Voice AI SDK: Server provided new session ID:', data.newSessionId);
+              this.sessionId = data.newSessionId;
+              this._saveSession();
+              // Пробуем снова с новой сессией
+              return this._configureSession();
+            }
+            
+            // Если сессия не найдена, пробуем создать новую
+            if (response.status === 404 && errorMessage.includes('Session not found')) {
+              console.log('Voice AI SDK: Session not found, creating a new one');
+              this.sessionId = null;
+              localStorage.removeItem('voice_ai_session');
+              await this._initSession();
+              // Пробуем снова с новой сессией
+              return this._configureSession();
+            }
+            
+            throw new Error(errorMessage);
           }
           
-          return data.client_secret.value;
+          // Set remote description
+          await this.peerConnection.setRemoteDescription(data.answer);
+          
+          // Save instructions
+          this.instructions = data.instructions;
+          
+          // Update UI
+          this._updateUI('idle');
+          
+          return true;
         } catch (error) {
-          console.error('Voice AI SDK: Failed to get ephemeral token', error);
+          console.error('Voice AI SDK: Session configuration failed', error);
+          this._updateUI('error');
           throw error;
         }
       }
   
+      /**
+       * Data channel open handler
+       * @private
+       */
+      _onDataChannelOpen() {
+        console.log('Voice AI SDK: Data channel opened');
+        
+        // Configure session
+        this._configureDataChannel();
+        
+        // Update UI
+        this._updateUI('idle');
+      }
+  
+      /**
+       * Configure data channel with session settings and initial prompt
+       * @private
+       */
+      _configureDataChannel() {
+        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+          console.log('Voice AI SDK: Data channel not open, cannot configure');
+          return;
+        }
+
+        console.log('Voice AI SDK: Configuring data channel');
+
+        // Send messages in sequence with proper timing
+        const sendMessages = async () => {
+          try {
+            // 1. Send session update
+            console.log('Voice AI SDK: Sending session update');
+            const sessionUpdate = {
+              type: 'session.update',
+              session: {
+                modalities: ['text', 'audio'],
+                tools: [],
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 200,
+                  create_response: true
+                },
+                instructions: this.instructions
+              }
+            };
+            
+            if (this.dataChannel && this.dataChannel.readyState === 'open') {
+              this.dataChannel.send(JSON.stringify(sessionUpdate));
+              
+              // Wait for a short time to ensure session update is processed
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // 2. Send initial message
+              if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                console.log('Voice AI SDK: Sending initial message');
+                const startPrompt = {
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'message',
+                    role: 'user',
+                    content: [{
+                      type: 'input_text',
+                      text: 'Begin the conversation by introducing yourself as an Improvado representative'
+                    }]
+                  }
+                };
+                
+                this.dataChannel.send(JSON.stringify(startPrompt));
+                
+                // Wait again before sending response.create
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                // 3. Request response creation
+                if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                  console.log('Voice AI SDK: Requesting response creation');
+                  const createResponse = {
+                    type: 'response.create'
+                  };
+                  
+                  this.dataChannel.send(JSON.stringify(createResponse));
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Voice AI SDK: Error sending messages:', error);
+          }
+        };
+        
+        // Start the message sequence
+        sendMessages();
+      }
+  
+      /**
+       * Data channel message handler
+       * @private
+       * @param {MessageEvent} event - The message event
+       */
+      _onDataChannelMessage(event) {
+        try {
+          // Handle empty messages
+          if (!event.data) {
+            console.warn('Voice AI SDK: Received empty message');
+            return;
+          }
+          
+          // Parse the message
+          const message = JSON.parse(event.data);
+          
+          // Handle messages without type
+          if (!message.type) {
+            console.warn('Voice AI SDK: Received message without type', message);
+            return;
+          }
+          
+          console.log('Voice AI SDK: Received message', message.type);
+          
+          // Add the message to the messages array
+          this.messages.push(message);
+          
+          // Handle different message types
+          switch (message.type) {
+            case 'input_audio_buffer.speech_started':
+              console.log('Voice AI SDK: Speech started');
+              this._updateUI('thinking');
+              break;
+              
+            case 'conversation.item.created':
+              console.log('Voice AI SDK: Conversation item created');
+              this._updateUI('responding');
+              break;
+              
+            case 'conversation.item.completed':
+              console.log('Voice AI SDK: Conversation item completed');
+              this._updateUI('idle');
+              break;
+              
+            case 'response.function_call_arguments.done':
+              console.log('Voice AI SDK: Function call arguments done');
+              // Handle function calls if needed
+              break;
+              
+            default:
+              // No special handling for other message types
+              break;
+          }
+          
+          // Dispatch an event for external listeners
+          const customEvent = new CustomEvent('voice-ai-message', {
+            detail: { message }
+          });
+          window.dispatchEvent(customEvent);
+          
+        } catch (error) {
+          console.error('Voice AI SDK: Error parsing message', error);
+        }
+      }
+  
+      /**
+       * Data channel close handler
+       * @private
+       */
+      _onDataChannelClose() {
+        console.log('Voice AI SDK: Data channel closed');
+        this.isListening = false;
+      }
+  
+      /**
+       * Data channel error handler
+       * @private
+       * @param {Event} error - The error event
+       */
+      _onDataChannelError(error) {
+        console.error('Voice AI SDK: Data channel error', error);
+      }
+  
+      /**
+       * ICE candidate handler
+       * @private
+       * @param {RTCPeerConnectionIceEvent} event - The ICE candidate event
+       */
+      _onIceCandidate(event) {
+        if (event.candidate) {
+          console.log('Voice AI SDK: New ICE candidate', event.candidate);
+        }
+      }
+  
+      /**
+       * Connection state change handler
+       * @private
+       */
+      _onConnectionStateChange() {
+        if (!this.peerConnection) return;
+        
+        console.log('Voice AI SDK: Connection state changed to', this.peerConnection.connectionState);
+        
+        switch (this.peerConnection.connectionState) {
+          case 'connected':
+            console.log('Voice AI SDK: WebRTC connection established');
+            this._updateUI('idle');
+            break;
+            
+          case 'disconnected':
+          case 'failed':
+            console.log('Voice AI SDK: WebRTC connection lost');
+            // Don't automatically close the session, just update UI
+            this._updateUI('error');
+            break;
+            
+          case 'closed':
+            console.log('Voice AI SDK: WebRTC connection closed');
+            this._updateUI('inactive');
+            break;
+        }
+      }
+  
+      /**
+       * Clean up WebRTC resources
+       * @private
+       */
+      _cleanupWebRTC() {
+        // Stop volume detection
+        this._stopVolumeDetection();
+        
+        // Close data channel
+        if (this.dataChannel) {
+          this.dataChannel.close();
+          this.dataChannel = null;
+        }
+        
+        // Close peer connection
+        if (this.peerConnection) {
+          this.peerConnection.close();
+          this.peerConnection = null;
+        }
+        
+        // Stop media stream
+        if (this.mediaStream) {
+          this.mediaStream.getTracks().forEach(track => track.stop());
+          this.mediaStream = null;
+        }
+        
+        // Close audio context
+        if (this.audioContext) {
+          this.audioContext.close().catch(console.error);
+          this.audioContext = null;
+          this.analyser = null;
+        }
+        
+        // Reset state
+        this.isListening = false;
+        this.currentVolume = 0;
+        
+        // Update UI
+        this._updateUI('idle');
+      }
+  
+      /**
+       * Start a new session
+       * @public
+       */
+      async startSession() {
+        if (this.isActive) return;
+        
+        try {
+          // Initialize WebRTC
+          await this._initWebRTC();
+          
+          // Configure session
+          await this._configureSession();
+          
+          // Set active state
+          this.isActive = true;
+          this.isListening = true;
+          
+          // Call onStart callback
+          if (typeof this.config.onStart === 'function') {
+            this.config.onStart();
+          }
+        } catch (error) {
+          console.error('Voice AI SDK: Failed to start session', error);
+          
+          // Clean up resources
+          this._cleanupWebRTC();
+          
+          // Call onError callback
+          if (typeof this.config.onError === 'function') {
+            this.config.onError(error);
+          }
+        }
+      }
+  
+      /**
+       * Stop the current session
+       * @public
+       */
+      stopSession() {
+        console.log('Voice AI SDK: Stopping session');
+        
+        // Clear volume detection interval
+        if (this.volumeInterval) {
+          clearInterval(this.volumeInterval);
+          this.volumeInterval = null;
+        }
+        
+        // Clear volume timeout
+        if (this.volumeTimeout) {
+          clearTimeout(this.volumeTimeout);
+          this.volumeTimeout = null;
+        }
+        
+        // Close audio context
+        if (this.audioContext) {
+          this.audioContext.close().catch(console.error);
+          this.audioContext = null;
+          this.analyser = null;
+        }
+        
+        // Clean up WebRTC resources
+        this._cleanupWebRTC();
+        
+        // Set active state
+        this.isActive = false;
+        
+        // Call onEnd callback
+        if (typeof this.config.onEnd === 'function') {
+          this.config.onEnd();
+        }
+      }
+  
+      /**
+       * Toggle session state
+       * @public
+       */
+      toggleSession() {
+        if (this.isActive) {
+          this.stopSession();
+        } else {
+          this.startSession();
+        }
+      }
+      
       /**
        * Initialize WebRTC
        * @private
        */
       async _initWebRTC() {
         try {
-          // Create audio context
-          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('Voice AI SDK: Initializing WebRTC');
           
-          // Get user media
-          this.mediaStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: false
-          });
-          
-          // Create analyser for volume detection
-          this.analyser = this.audioContext.createAnalyser();
-          this.analyser.fftSize = 1024;
-          
-          // Connect media stream to analyser
-          const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-          source.connect(this.analyser);
-          
-          // Create peer connection
+          // Create a new RTCPeerConnection
           this.peerConnection = new RTCPeerConnection({
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' }
             ]
           });
           
-          // Add audio track to peer connection
-          this.mediaStream.getAudioTracks().forEach(track => {
-            this.peerConnection.addTrack(track, this.mediaStream);
+          // Set up event handlers
+          this.peerConnection.onicecandidate = this._onIceCandidate.bind(this);
+          this.peerConnection.onconnectionstatechange = this._onConnectionStateChange.bind(this);
+          
+          // Get user media
+          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          
+          // Set up audio visualization
+          this._setupAudioVisualization(this.stream);
+          
+          // Add the audio track to the peer connection
+          this.stream.getAudioTracks().forEach(track => {
+            this.peerConnection.addTrack(track, this.stream);
           });
           
-          // Create data channel
-          this.dataChannel = this.peerConnection.createDataChannel('audio');
+          // Set up audio output
+          this.audioElement = document.createElement('audio');
+          this.audioElement.autoplay = true;
           
-          // Set up data channel event handlers
+          this.peerConnection.ontrack = (event) => {
+            console.log('Voice AI SDK: Received audio track');
+            this.audioElement.srcObject = event.streams[0];
+          };
+          
+          // Create a data channel
+          this.dataChannel = this.peerConnection.createDataChannel('response');
           this.dataChannel.onopen = this._onDataChannelOpen.bind(this);
           this.dataChannel.onmessage = this._onDataChannelMessage.bind(this);
           this.dataChannel.onclose = this._onDataChannelClose.bind(this);
           this.dataChannel.onerror = this._onDataChannelError.bind(this);
           
-          // Set up peer connection event handlers
-          this.peerConnection.onicecandidate = this._onIceCandidate.bind(this);
-          this.peerConnection.onconnectionstatechange = this._onConnectionStateChange.bind(this);
-          
-          // Create offer
+          // Create an offer
           const offer = await this.peerConnection.createOffer();
           await this.peerConnection.setLocalDescription(offer);
           
-          // Start volume detection
-          this._startVolumeDetection();
+          console.log('Voice AI SDK: Created offer');
           
-          // Update UI
-          this._updateUI('idle');
+          return true;
         } catch (error) {
-          console.error('Voice AI SDK: WebRTC initialization failed', error);
-          throw error;
+          console.error('Voice AI SDK: Error initializing WebRTC', error);
+          this._updateUI('error');
+          return false;
+        }
+      }
+  
+      _setupAudioVisualization(stream) {
+        try {
+          // Create audio context
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 256;
+          
+          source.connect(analyser);
+          
+          // Set up volume detection
+          const bufferLength = analyser.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+          
+          const getVolume = () => {
+            analyser.getByteTimeDomainData(dataArray);
+            
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const float = (dataArray[i] - 128) / 128;
+              sum += float * float;
+            }
+            
+            return Math.sqrt(sum / dataArray.length);
+          };
+          
+          // Start volume detection interval
+          this.volumeInterval = setInterval(() => {
+            const volume = getVolume();
+            
+            // Update UI based on volume
+            if (volume > 0.02) {
+              this._updateUI('volume', volume);
+            } else if (this.uiMode === 'volume') {
+              // Delay switching back to idle to prevent flickering
+              if (!this.volumeTimeout) {
+                this.volumeTimeout = setTimeout(() => {
+                  this._updateUI('idle');
+                  this.volumeTimeout = null;
+                }, 500);
+              }
+            }
+          }, 100);
+          
+          this.audioContext = audioContext;
+          this.analyser = analyser;
+          
+        } catch (error) {
+          console.error('Voice AI SDK: Error setting up audio visualization', error);
         }
       }
   
@@ -545,252 +1023,6 @@
         if (this.volumeInterval) {
           clearInterval(this.volumeInterval);
           this.volumeInterval = null;
-        }
-      }
-  
-      /**
-       * Data channel open handler
-       * @private
-       */
-      _onDataChannelOpen() {
-        console.log('Voice AI SDK: Data channel open');
-        
-        // Configure session
-        this._configureSession();
-      }
-  
-      /**
-       * Configure session
-       * @private
-       */
-      async _configureSession() {
-        if (!this.dataChannel || this.dataChannel.readyState !== 'open') return;
-        
-        try {
-          // Get ephemeral token
-          const token = await this._getEphemeralToken();
-          
-          // Send session configuration
-          const sessionConfig = {
-            type: 'session.update',
-            session: {
-              modalities: ['text', 'audio'],
-              tools: [],
-              turn_detection: {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 200,
-                create_response: true
-              },
-              instructions: await this._fetchInstructions()
-            }
-          };
-          
-          this.dataChannel.send(JSON.stringify(sessionConfig));
-          
-          // Send authentication
-          const auth = {
-            type: 'auth',
-            client_secret: token
-          };
-          
-          this.dataChannel.send(JSON.stringify(auth));
-          
-          // Send voice configuration
-          const voiceConfig = {
-            type: 'voice.update',
-            voice: {
-              voice_id: this.config.voice || 'alloy'
-            }
-          };
-          
-          this.dataChannel.send(JSON.stringify(voiceConfig));
-          
-          // Set listening state
-          this.isListening = true;
-        } catch (error) {
-          console.error('Voice AI SDK: Session configuration failed', error);
-          this.stopSession();
-        }
-      }
-  
-      /**
-       * Data channel message handler
-       * @private
-       * @param {MessageEvent} event - The message event
-       */
-      _onDataChannelMessage(event) {
-        try {
-          const message = JSON.parse(event.data);
-          
-          // Add message to messages array
-          this.messages.push(message);
-          
-          // Handle different message types
-          switch (message.type) {
-            case 'input_audio_buffer.speech_started':
-              this._updateUI('thinking');
-              break;
-              
-            case 'conversation.item.created':
-              this._updateUI('responding');
-              break;
-              
-            case 'conversation.item.completed':
-              this._updateUI('idle');
-              break;
-          }
-        } catch (error) {
-          console.error('Voice AI SDK: Failed to parse message', error);
-        }
-      }
-  
-      /**
-       * Data channel close handler
-       * @private
-       */
-      _onDataChannelClose() {
-        console.log('Voice AI SDK: Data channel closed');
-        this.isListening = false;
-      }
-  
-      /**
-       * Data channel error handler
-       * @private
-       * @param {Event} error - The error event
-       */
-      _onDataChannelError(error) {
-        console.error('Voice AI SDK: Data channel error', error);
-      }
-  
-      /**
-       * ICE candidate handler
-       * @private
-       * @param {RTCPeerConnectionIceEvent} event - The ICE candidate event
-       */
-      _onIceCandidate(event) {
-        if (event.candidate) {
-          console.log('Voice AI SDK: New ICE candidate', event.candidate);
-        }
-      }
-  
-      /**
-       * Connection state change handler
-       * @private
-       */
-      _onConnectionStateChange() {
-        console.log('Voice AI SDK: Connection state changed', this.peerConnection.connectionState);
-        
-        if (this.peerConnection.connectionState === 'disconnected' || 
-            this.peerConnection.connectionState === 'failed' || 
-            this.peerConnection.connectionState === 'closed') {
-          this.stopSession();
-        }
-      }
-  
-      /**
-       * Clean up WebRTC resources
-       * @private
-       */
-      _cleanupWebRTC() {
-        // Stop volume detection
-        this._stopVolumeDetection();
-        
-        // Close data channel
-        if (this.dataChannel) {
-          this.dataChannel.close();
-          this.dataChannel = null;
-        }
-        
-        // Close peer connection
-        if (this.peerConnection) {
-          this.peerConnection.close();
-          this.peerConnection = null;
-        }
-        
-        // Stop media stream
-        if (this.mediaStream) {
-          this.mediaStream.getTracks().forEach(track => track.stop());
-          this.mediaStream = null;
-        }
-        
-        // Close audio context
-        if (this.audioContext) {
-          this.audioContext.close();
-          this.audioContext = null;
-        }
-        
-        // Reset analyser
-        this.analyser = null;
-        
-        // Reset state
-        this.isListening = false;
-        this.currentVolume = 0;
-        
-        // Update UI
-        this._updateUI('idle');
-      }
-  
-      /**
-       * Start a new session
-       * @public
-       */
-      async startSession() {
-        if (this.isActive) return;
-        
-        try {
-          // Initialize WebRTC
-          await this._initWebRTC();
-          
-          // Set active state
-          this.isActive = true;
-          
-          // Call onStart callback
-          if (typeof this.config.onStart === 'function') {
-            this.config.onStart();
-          }
-        } catch (error) {
-          console.error('Voice AI SDK: Failed to start session', error);
-          
-          // Clean up resources
-          this._cleanupWebRTC();
-          
-          // Call onError callback
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(error);
-          }
-        }
-      }
-  
-      /**
-       * Stop the current session
-       * @public
-       */
-      stopSession() {
-        if (!this.isActive) return;
-        
-        // Clean up WebRTC resources
-        this._cleanupWebRTC();
-        
-        // Set active state
-        this.isActive = false;
-        
-        // Call onEnd callback
-        if (typeof this.config.onEnd === 'function') {
-          this.config.onEnd();
-        }
-      }
-  
-      /**
-       * Toggle session state
-       * @public
-       */
-      toggleSession() {
-        if (this.isActive) {
-          this.stopSession();
-        } else {
-          this.startSession();
         }
       }
     }

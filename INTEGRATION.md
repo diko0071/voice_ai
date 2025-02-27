@@ -16,7 +16,6 @@ This guide provides instructions for integrating the Voice AI JavaScript SDK int
 
 Before integrating the Voice AI SDK, ensure you have:
 
-- An OpenAI API key
 - Access to the Voice AI server or your own deployment
 - Domain authorization for your website
 
@@ -27,8 +26,8 @@ Before integrating the Voice AI SDK, ensure you have:
 Create a `.env.local` file in the root of your Voice AI server with the following variables:
 
 ```
-# OpenAI API Key
-NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key_here
+# OpenAI API Key (kept securely on the server)
+OPENAI_API_KEY=your_openai_api_key_here
 
 # Application URL
 NEXT_PUBLIC_APP_URL=https://your-voice-service.com
@@ -126,6 +125,38 @@ The SDK supports various configuration options:
 </script>
 ```
 
+## API Endpoints
+
+The SDK communicates with the following server endpoints:
+
+### `/api/v1/auth/validate`
+
+- **Method**: POST
+- **Request Body**:
+  - `clientId`: The client ID
+- **Response**:
+  - `valid`: Boolean indicating if the client is valid
+
+### `/api/v1/sessions`
+
+- **Method**: POST
+- **Request Body**:
+  - `clientId`: The client ID
+- **Response**:
+  - `sessionId`: The session ID
+
+### `/api/v1/voice/process`
+
+- **Method**: POST
+- **Request Body**:
+  - `clientId`: The client ID
+  - `sessionId`: The session ID
+  - `offer`: The WebRTC offer
+  - `voice`: (Optional) The voice to use (default: 'alloy')
+- **Response**:
+  - `answer`: The WebRTC answer from OpenAI
+  - `instructions`: The agent instructions
+
 ## Customization
 
 ### Using CSS
@@ -166,6 +197,7 @@ The SDK includes several security features:
 1. **Domain Validation**: The server validates that requests come from authorized domains.
 2. **Client ID Validation**: Each request requires a valid client ID.
 3. **Session Management**: User sessions are managed securely.
+4. **Server-Side OpenAI Integration**: The OpenAI API key is kept securely on the server and never exposed to the client.
 
 ### CORS Configuration
 
@@ -187,8 +219,8 @@ The server is configured to only accept requests from authorized domains. Make s
 
 3. **Voice recognition issues**:
    - Check internet connection
-   - Verify that the OpenAI API key is valid
    - Ensure the microphone is working properly
+   - Verify that the server is properly configured with a valid OpenAI API key
 
 ### Browser Support
 

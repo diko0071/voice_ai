@@ -5,7 +5,7 @@ This is a [Next.js](https://nextjs.org) project that provides a voice control as
 ## Features
 
 - Voice command processing via WebRTC
-- OpenAI integration for natural language understanding
+- Server-side OpenAI integration for enhanced security
 - JavaScript SDK for easy integration into any website
 - Customizable UI with multiple themes and positions
 - Session management and client validation
@@ -24,7 +24,7 @@ npm install
 Create a `.env.local` file based on the `.env.example` template and add your OpenAI API key:
 
 ```
-NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=your_openai_api_key
 # Additional environment variables as specified in .env.example
 ```
 
@@ -51,12 +51,19 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
     - `log/` - Application logging
     - `session/` - Session management
     - `v1/` - API endpoints for SDK
+      - `voice/process/` - WebRTC offer processing
+      - `auth/validate/` - Client validation
+      - `sessions/` - Session management
 - `hooks/` - Custom React hooks
   - `use-webrtc.ts` - Voice capture via WebRTC
   - `logger.ts` - Logging utilities
 - `lib/` - Utility libraries
   - `security.ts` - Client validation utilities
   - `sessions.ts` - Session management utilities
+  - `openai-webrtc.ts` - Server-side OpenAI WebRTC integration
+  - `openai-sessions.ts` - OpenAI session management
+- `prompts/` - OpenAI prompt templates
+  - `agent-instructions.ts` - Instructions for the voice assistant
 - `public/sdk/` - JavaScript SDK files
   - `voice-ai-sdk.js` - Main SDK file
   - `voice-ai-sdk.min.js` - Minified SDK for production
@@ -86,6 +93,16 @@ Basic integration example:
   });
 </script>
 ```
+
+## Server-Side OpenAI Integration
+
+This project uses a server-side approach for OpenAI integration, which provides several benefits:
+
+1. **Enhanced Security**: The OpenAI API key is kept securely on the server and never exposed to the client.
+2. **Centralized Control**: All interactions with OpenAI are managed by the server, allowing for monitoring and logging.
+3. **Simplified Client**: The client SDK only needs to handle WebRTC connection setup and UI management.
+
+For more details on the server-side integration, see [SERVER_SIDE_INTEGRATION.md](SERVER_SIDE_INTEGRATION.md).
 
 ## Demo
 

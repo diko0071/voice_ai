@@ -1,7 +1,7 @@
 # Voice AI: Voice Control Assistant
 
 ## Overview
-Next.js app with voice commands via WebRTC and OpenAI.
+Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK for website integration.
 
 ## Structure
 - `app/` - Next.js App Router code
@@ -11,25 +11,44 @@ Next.js app with voice commands via WebRTC and OpenAI.
   - `chatgpt.tsx` - OpenAI voice processing
   - `api/` - Backend endpoints
     - `log/` - Application logging
+    - `session/` - Session management
+    - `v1/` - API endpoints for SDK
+      - `auth/` - Client validation
+      - `sessions/` - Session management
+      - `voice/` - Voice processing
 - `hooks/` - Custom React hooks
   - `use-webrtc.ts` - Voice capture via WebRTC
   - `logger.ts` - Logging utilities
+- `lib/` - Utility libraries
+  - `security.ts` - Client validation
+  - `sessions.ts` - Session management
 - `public/` - Static assets
+  - `sdk/` - Voice AI SDK files
+    - `voice-ai-sdk.js` - Main SDK
+    - `voice-ai-sdk.min.js` - Minified SDK
+    - `voice-ai-styles.css` - SDK styles
+- `tests/` - Test files
+  - `security-test.js` - Security tests
+  - `sdk-test.js` - SDK tests
 - `.env.local` - Environment variables
   - `NEXT_PUBLIC_OPENAI_API_KEY` - OpenAI API key
+  - `ALLOWED_CLIENTS` - Authorized clients
+  - `CLIENT_*_DOMAINS` - Allowed domains
 - `next.config.ts` - Next.js config
 - `package.json` - Dependencies
 - `tailwind.config.ts` - Styling config
 - `tsconfig.json` - TypeScript config
+- `INTEGRATION.md` - SDK integration guide
 
 ## Flow
 1. `page.tsx` → `ChatGPT` component
 2. WebRTC captures voice
 3. ChatGPT processes commands
 4. Voice assistant responds to user
+5. SDK enables integration on any website
 
 ## Setup
 1. Create `.env.local` from example
-2. Add OpenAI API key
+2. Add OpenAI API key and client configuration
 3. Run `npm run dev`
 4. Open http://localhost:3000 

@@ -3,7 +3,7 @@
  
 import { useState, useRef, useEffect } from "react";
 import { logger } from '../logger';
-import { agentInstructions } from '../../prompts/webapp/agent-instructions';
+import { agentInstructions } from '../../prompts/agent-instructions';
  
 const useWebRTCAudioSession = (voice: string) => {
   const [status, setStatus] = useState("");

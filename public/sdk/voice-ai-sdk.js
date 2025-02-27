@@ -185,6 +185,29 @@
       }
   
       /**
+       * Fetch agent instructions from server
+       * @private
+       */
+      async _fetchInstructions() {
+        try {
+          const response = await fetch(`${this.config.serverUrl}/api/v1/instructions?clientId=${this.clientId}`, {
+            method: 'GET'
+          });
+          
+          if (!response.ok) {
+            console.warn('Voice AI SDK: Failed to fetch instructions, using default');
+            return this.config.instructions || 'You are a helpful voice assistant.';
+          }
+          
+          const data = await response.json();
+          return data.instructions;
+        } catch (error) {
+          console.error('Voice AI SDK: Failed to fetch instructions', error);
+          return this.config.instructions || 'You are a helpful voice assistant.';
+        }
+      }
+  
+      /**
        * Create UI elements
        * @private
        */
@@ -560,7 +583,7 @@
                 silence_duration_ms: 200,
                 create_response: true
               },
-              instructions: this.config.instructions || 'You are a helpful voice assistant.'
+              instructions: await this._fetchInstructions()
             }
           };
           

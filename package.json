@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npm run test:sdk && npm run test:security && npm run test:webapp",
+    "test": "npm run test:sdk && npm run test:security && npm run test:webapp && npm run test:api",
     "test:sdk": "node tests/sdk-test.js",
     "test:security": "node tests/security-test.js",
     "test:webapp": "node tests/webapp/ChatGPT.test.js && node tests/webapp/use-webrtc.test.js && node tests/webapp/api-routes.test.js",
+    "test:api": "node tests/api-endpoints.test.js",
     "minify": "uglifyjs public/sdk/voice-ai-sdk.js -o public/sdk/voice-ai-sdk.min.js -c -m",
     "deploy-sdk": "bash scripts/deploy-sdk.sh"
   },

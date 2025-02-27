@@ -1,5 +1,7 @@
 # Voice AI: Voice Control Assistant
 
+[![Tests](https://github.com/improvado/voice_ai/actions/workflows/tests.yml/badge.svg)](https://github.com/improvado/voice_ai/actions/workflows/tests.yml)
+
 This is a [Next.js](https://nextjs.org) project that provides a voice control assistant with WebRTC and OpenAI integration. The project includes a JavaScript SDK that can be embedded on any website to enable voice command functionality.
 
 ## Features
@@ -107,6 +109,16 @@ For more details on the server-side integration, see [SERVER_SIDE_INTEGRATION.md
 ## Demo
 
 A demo page is available at [http://localhost:3000/sdk/demo.html](http://localhost:3000/sdk/demo.html) when running the development server. This demo showcases the SDK's features and allows you to test different configurations.
+
+## Testing
+
+The project uses Jest for testing. To run the tests locally:
+
+```bash
+npm test
+```
+
+Tests are automatically run on GitHub Actions for every pull request and push to the main branch. The test status is displayed in the badge at the top of this README.
 
 ## Learn More
 

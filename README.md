@@ -1,7 +1,5 @@
 # Voice AI: Voice Control Assistant
 
-[![Tests](https://github.com/improvado/voice_ai/actions/workflows/tests.yml/badge.svg)](https://github.com/improvado/voice_ai/actions/workflows/tests.yml)
-
 This is a [Next.js](https://nextjs.org) project that provides a voice control assistant with WebRTC and OpenAI integration. The project includes a JavaScript SDK that can be embedded on any website to enable voice command functionality.
 
 ## Features

@@ -13,7 +13,6 @@
       position: 'bottom-right',
       theme: 'light',
       language: 'en',
-      serverUrl: window.location.origin,
       customStyles: {}
     };
   
@@ -38,8 +37,35 @@
         this.sessionValidationInProgress = false;
         
         // Validate required configuration
+        let hasErrors = false;
+        
         if (!this.clientId) {
-          console.error('Voice AI SDK: Client ID is required');
+          console.error('Voice AI SDK: Client ID is required. Please provide a valid clientId in the configuration.');
+          hasErrors = true;
+        }
+        
+        if (!this.config.serverUrl) {
+          console.error('Voice AI SDK: Server URL is required. Please provide a valid serverUrl in the configuration.');
+          console.error('Example: serverUrl: "https://voice-ai-sandy.vercel.app"');
+          hasErrors = true;
+        }
+        
+        // Check if serverUrl is a valid URL
+        if (this.config.serverUrl) {
+          try {
+            new URL(this.config.serverUrl);
+          } catch (e) {
+            console.error(`Voice AI SDK: Invalid Server URL "${this.config.serverUrl}". Please provide a valid URL.`);
+            hasErrors = true;
+          }
+        }
+        
+        // Log current domain for debugging
+        console.log('Voice AI SDK: Current domain:', window.location.hostname);
+        console.log('Voice AI SDK: Server URL:', this.config.serverUrl);
+        
+        if (hasErrors) {
+          console.error('Voice AI SDK: Initialization failed due to configuration errors.');
           return;
         }
         
@@ -168,7 +194,13 @@
        */
       async _validateClient() {
         try {
-          const response = await fetch(`${this.config.serverUrl}/api/v1/auth/validate`, {
+          console.log(`Voice AI SDK: Validating client "${this.clientId}" with server at "${this.config.serverUrl}"`);
+          console.log(`Voice AI SDK: Current page URL: ${window.location.href}`);
+          
+          const validateUrl = `${this.config.serverUrl}/api/v1/auth/validate`;
+          console.log(`Voice AI SDK: Validation endpoint: ${validateUrl}`);
+          
+          const response = await fetch(validateUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -178,15 +210,43 @@
             })
           });
           
+          if (!response.ok) {
+            const errorStatus = response.status;
+            let errorData;
+            
+            try {
+              errorData = await response.json();
+            } catch (e) {
+              // If response is not JSON
+              throw new Error(`Server returned ${errorStatus} status code. Check if your domain is authorized for this client ID.`);
+            }
+            
+            if (errorStatus === 403) {
+              console.error(`Voice AI SDK: Domain "${window.location.hostname}" is not authorized for client "${this.clientId}".`);
+              console.error('Voice AI SDK: Make sure your domain is added to the CLIENT_' + this.clientId + '_DOMAINS environment variable on the server.');
+              throw new Error(errorData.error || `Domain not authorized. Status: ${errorStatus}`);
+            } else {
+              throw new Error(errorData.error || `Client validation failed. Status: ${errorStatus}`);
+            }
+          }
+          
           const data = await response.json();
           
-          if (!response.ok || !data.valid) {
-            throw new Error(data.error || 'Client validation failed');
+          if (!data.valid) {
+            throw new Error(data.error || 'Client validation failed: Server returned invalid status');
           }
           
           console.log('Voice AI SDK: Client validated successfully');
         } catch (error) {
           console.error('Voice AI SDK: Client validation failed', error);
+          
+          // Check if it's a network error (CORS, connection refused, etc.)
+          if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+            console.error(`Voice AI SDK: Network error occurred. This might be due to CORS restrictions.`);
+            console.error(`Voice AI SDK: Make sure your domain "${window.location.hostname}" is added to the CLIENT_${this.clientId}_DOMAINS environment variable on the server.`);
+            console.error(`Voice AI SDK: Also check that the serverUrl "${this.config.serverUrl}" is correct and accessible.`);
+          }
+          
           throw error;
         }
       }

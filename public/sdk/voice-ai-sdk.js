@@ -349,10 +349,20 @@
         idleAnimation.className = 'voice-ai-idle-animation';
         idleAnimation.style.width = '32px';
         idleAnimation.style.height = '32px';
-        idleAnimation.style.borderRadius = '50%';
-        idleAnimation.style.backgroundColor = '#ffffff';
-        idleAnimation.style.opacity = '0.8';
+        idleAnimation.style.display = 'flex';
+        idleAnimation.style.alignItems = 'center';
+        idleAnimation.style.justifyContent = 'center';
         idleAnimation.style.animation = 'voice-ai-pulse 2s infinite';
+        
+        // Add microphone icon
+        const microphoneImg = document.createElement('img');
+        microphoneImg.src = `${this.config.serverUrl || ''}/microphone.svg`;
+        microphoneImg.alt = 'Microphone';
+        microphoneImg.style.width = '24px';
+        microphoneImg.style.height = '24px';
+        
+        // Add image to idle animation
+        idleAnimation.appendChild(microphoneImg);
         
         // Add animation to container
         animationContainer.appendChild(idleAnimation);
@@ -425,6 +435,7 @@
         const button = this.ui.button;
         const buttonContainer = this.ui.animationContainer;
         const statusText = this.ui.container.querySelector('.voice-ai-status');
+        const microphoneImg = this.ui.idleAnimation.querySelector('img');
         
         if (!button || !buttonContainer) return;
         
@@ -435,6 +446,15 @@
           'voice-ai-responding',
           'voice-ai-error'
         );
+        
+        // Hide/show microphone based on mode
+        if (microphoneImg) {
+          if (mode === 'inactive' || mode === 'idle') {
+            microphoneImg.style.display = 'block';
+          } else {
+            microphoneImg.style.display = 'none';
+          }
+        }
         
         // Update UI based on mode
         switch (mode) {

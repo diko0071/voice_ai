@@ -34,6 +34,7 @@ echo "Copying SDK files to $DEST/sdk..."
 cp public/sdk/voice-ai-sdk.min.js "$DEST/sdk/"
 cp public/sdk/voice-ai-styles.css "$DEST/sdk/"
 cp public/sdk/demo.html "$DEST/sdk/"
+cp public/microphone.svg "$DEST/sdk/"
 
 # Create version info file
 echo "Creating version info file..."

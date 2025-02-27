@@ -45,10 +45,15 @@
 .voice-ai-idle-animation {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   animation: voice-ai-pulse 2s infinite;
+}
+
+.voice-ai-idle-animation img {
+  width: 24px;
+  height: 24px;
 }
 
 /* Thinking Animation */

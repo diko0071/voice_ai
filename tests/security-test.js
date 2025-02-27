@@ -21,7 +21,12 @@ const securityFileContent = fs.readFileSync(securityFilePath, 'utf8');
 
 // Extract functions for testing
 const extractDomainFn = extractFunction(securityFileContent, 'extractDomain');
-const validateClientFn = extractFunction(securityFileContent, 'validateClient');
+const validateClientFn = extractFunctionWithDependency(
+  securityFileContent, 
+  'validateClient', 
+  'extractDomain', 
+  extractDomainFn
+);
 const generateSessionIdFn = extractFunction(securityFileContent, 'generateSessionId');
 
 // Test results
@@ -68,6 +73,19 @@ function extractFunction(content, functionName) {
   
   // Create a function from the extracted code
   // This is a simplified approach and may not work for all functions
+  let functionBody = match[1];
+  
+  // Replace TypeScript-specific code with JavaScript equivalents
+  functionBody = functionBody.replace(/const allowedClients = process\.env\.ALLOWED_CLIENTS\?\.split\(','\) \|\| \[\];/g, 
+    'const _allowedClients = process.env.ALLOWED_CLIENTS ? process.env.ALLOWED_CLIENTS.split(",") : [];');
+  
+  functionBody = functionBody.replace(/allowedClients\.includes\(clientId\)/g, '_allowedClients.includes(clientId)');
+  
+  functionBody = functionBody.replace(/const allowedDomains = process\.env\[`CLIENT_\${clientId}_DOMAINS`\]\?\.split\(','\) \|\| \[\];/g,
+    'const _allowedDomains = process.env[`CLIENT_${clientId}_DOMAINS`] ? process.env[`CLIENT_${clientId}_DOMAINS`].split(",") : [];');
+  
+  functionBody = functionBody.replace(/allowedDomains\.includes\(refererDomain\)/g, '_allowedDomains.includes(refererDomain)');
+  
   return new Function('referer', 'clientId', 'allowedClients', `
     // Mock TypeScript environment
     const process = { env: {
@@ -78,7 +96,59 @@ function extractFunction(content, functionName) {
     }};
     
     // Function body
-    ${match[1]}
+    ${functionBody}
+    
+    // Return the result
+    return ${functionName === 'extractDomain' ? 'domain' : 
+            functionName === 'validateClient' ? 'isValid' : 
+            functionName === 'generateSessionId' ? 'sessionId' : 'null'};
+  `);
+}
+
+/**
+ * Extract function with dependency from TypeScript file content
+ */
+function extractFunctionWithDependency(content, functionName, dependencyName, dependencyFn) {
+  const functionRegex = new RegExp(`export function ${functionName}\\s*\\([^)]*\\)\\s*[^{]*{([\\s\\S]*?)\\n}`);
+  const match = content.match(functionRegex);
+  
+  if (!match) {
+    throw new Error(`Function ${functionName} not found in the file content`);
+  }
+  
+  // Create a function from the extracted code
+  // This is a simplified approach and may not work for all functions
+  let functionBody = match[1];
+  
+  // Replace TypeScript-specific code with JavaScript equivalents
+  functionBody = functionBody.replace(/const allowedClients = process\.env\.ALLOWED_CLIENTS\?\.split\(','\) \|\| \[\];/g, 
+    'const _allowedClients = process.env.ALLOWED_CLIENTS ? process.env.ALLOWED_CLIENTS.split(",") : [];');
+  
+  functionBody = functionBody.replace(/allowedClients\.includes\(clientId\)/g, '_allowedClients.includes(clientId)');
+  
+  functionBody = functionBody.replace(/const allowedDomains = process\.env\[`CLIENT_\${clientId}_DOMAINS`\]\?\.split\(','\) \|\| \[\];/g,
+    'const _allowedDomains = process.env[`CLIENT_${clientId}_DOMAINS`] ? process.env[`CLIENT_${clientId}_DOMAINS`].split(",") : [];');
+  
+  functionBody = functionBody.replace(/allowedDomains\.includes\(refererDomain\)/g, '_allowedDomains.includes(refererDomain)');
+  
+  return new Function('referer', 'clientId', 'allowedClients', `
+    // Mock TypeScript environment
+    const process = { env: {
+      ALLOWED_CLIENTS: 'client1,client2,client3',
+      CLIENT_client1_DOMAINS: 'domain1.com,www.domain1.com',
+      CLIENT_client2_DOMAINS: 'domain2.com,www.domain2.com',
+      CLIENT_client3_DOMAINS: 'domain3.com,www.domain3.com'
+    }};
+    
+    // Mock dependency function
+    const extractDomain = function(url) {
+      return ${dependencyName === 'extractDomain' ? 
+        `(${dependencyFn.toString()})(url)` : 
+        'null'};
+    };
+    
+    // Function body
+    ${functionBody}
     
     // Return the result
     return ${functionName === 'extractDomain' ? 'domain' : 

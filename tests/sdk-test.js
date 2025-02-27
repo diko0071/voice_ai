@@ -100,6 +100,72 @@ testGroup('DOM Integration Tests', () => {
   const { window } = dom;
   const { document } = window;
   
+  // Mock fetch API
+  window.fetch = async (url, options) => {
+    // Mock successful responses for different endpoints
+    if (url.includes('/api/v1/auth/validate')) {
+      return {
+        ok: true,
+        json: async () => ({ valid: true })
+      };
+    } else if (url.includes('/api/v1/sessions')) {
+      return {
+        ok: true,
+        json: async () => ({ sessionId: 'test-session-id' })
+      };
+    } else if (url.includes('/api/v1/voice/token')) {
+      return {
+        ok: true,
+        json: async () => ({ client_secret: { value: 'test-token' } })
+      };
+    }
+    
+    // Default response
+    return {
+      ok: false,
+      json: async () => ({ error: 'Not found' })
+    };
+  };
+  
+  // Mock localStorage
+  window.localStorage = {
+    getItem: (key) => null,
+    setItem: (key, value) => {}
+  };
+  
+  // Mock AudioContext
+  window.AudioContext = class AudioContext {
+    constructor() {}
+    createAnalyser() { return { fftSize: 0, frequencyBinCount: 0, getByteFrequencyData: () => {} }; }
+    createMediaStreamSource() { return { connect: () => {} }; }
+    close() {}
+  };
+  window.webkitAudioContext = window.AudioContext;
+  
+  // Mock RTCPeerConnection
+  window.RTCPeerConnection = class RTCPeerConnection {
+    constructor() {
+      this.onicecandidate = null;
+      this.onconnectionstatechange = null;
+      this.connectionState = 'connected';
+    }
+    addTrack() {}
+    createDataChannel() {
+      return {
+        onopen: null,
+        onmessage: null,
+        onclose: null,
+        onerror: null,
+        readyState: 'open',
+        send: () => {},
+        close: () => {}
+      };
+    }
+    createOffer() { return Promise.resolve({}); }
+    setLocalDescription() { return Promise.resolve(); }
+    close() {}
+  };
+  
   // Inject the SDK script
   const script = document.createElement('script');
   script.textContent = fs.readFileSync(TEST_CONFIG.sdkPath, 'utf8');
@@ -109,7 +175,10 @@ testGroup('DOM Integration Tests', () => {
   try {
     // Mock WebRTC and other browser APIs
     window.navigator.mediaDevices = {
-      getUserMedia: () => Promise.resolve({})
+      getUserMedia: () => Promise.resolve({
+        getAudioTracks: () => [{ enabled: true }],
+        getTracks: () => [{ stop: () => {} }]
+      })
     };
     
     // Initialize the SDK
@@ -125,28 +194,42 @@ testGroup('DOM Integration Tests', () => {
     assert(typeof voiceAI.stopSession === 'function', 'SDK object has stopSession method');
     assert(typeof voiceAI.toggleSession === 'function', 'SDK object has toggleSession method');
     
-    // Check if UI elements were created
-    const container = document.querySelector('.voice-ai-container');
-    assert(container !== null, 'SDK creates container element');
-    
-    const button = document.querySelector('.voice-ai-button');
-    assert(button !== null, 'SDK creates button element');
+    // Wait for async operations to complete
+    setTimeout(() => {
+      // Check if UI elements were created
+      const container = document.querySelector('.voice-ai-container');
+      assert(container !== null, 'SDK creates container element');
+      
+      const button = document.querySelector('.voice-ai-button');
+      assert(button !== null, 'SDK creates button element');
+      
+      // Print test summary
+      console.log('\n📊 TEST SUMMARY');
+      console.log('='.repeat(50));
+      console.log(`Total tests: ${results.total}`);
+      console.log(`Passed: ${results.passed}`);
+      console.log(`Failed: ${results.failed}`);
+      console.log(`Success rate: ${Math.round((results.passed / results.total) * 100)}%`);
+      console.log('='.repeat(50));
+      
+      // Exit with appropriate code
+      process.exit(results.failed > 0 ? 1 : 0);
+    }, 500);
     
   } catch (error) {
+    console.error('Error in DOM Integration Tests:', error);
     assert(false, `SDK initialization failed: ${error.message}`);
+    
+    // Print test summary
+    console.log('\n📊 TEST SUMMARY');
+    console.log('='.repeat(50));
+    console.log(`Total tests: ${results.total}`);
+    console.log(`Passed: ${results.passed}`);
+    console.log(`Failed: ${results.failed}`);
+    console.log(`Success rate: ${Math.round((results.passed / results.total) * 100)}%`);
+    console.log('='.repeat(50));
+    
+    // Exit with appropriate code
+    process.exit(results.failed > 0 ? 1 : 0);
   }
-});
-
-/**
- * Print test summary
- */
-console.log('\n📊 TEST SUMMARY');
-console.log('='.repeat(50));
-console.log(`Total tests: ${results.total}`);
-console.log(`Passed: ${results.passed}`);
-console.log(`Failed: ${results.failed}`);
-console.log(`Success rate: ${Math.round((results.passed / results.total) * 100)}%`);
-console.log('='.repeat(50));
-
-// Exit with appropriate code
-process.exit(results.failed > 0 ? 1 : 0); 
+}); 

@@ -21,6 +21,8 @@
   cursor: pointer;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .voice-ai-button:hover {
@@ -39,6 +41,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 /* Idle Animation */
@@ -56,6 +59,15 @@
   height: 24px;
 }
 
+/* Loading Animation */
+.voice-ai-loading-animation {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  animation: voice-ai-pulse-fast 1s infinite;
+}
+
 /* Thinking Animation */
 .voice-ai-thinking-animation {
   width: 32px;
@@ -70,24 +82,32 @@
 .voice-ai-responding-animation {
   width: 32px;
   height: 32px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  animation: voice-ai-pulse 2s infinite;
+  border-radius: 50%;
+  background-color: #ffffff;
+  animation: voice-ai-pulse-responding 1.5s infinite ease-in-out;
 }
 
-/* Volume Animation */
+/* Volume Animation - Inside Button */
 .voice-ai-volume-container {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
   height: 32px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: voice-ai-container-pulse 2s infinite ease-in-out;
 }
 
 .voice-ai-volume-bar {
   width: 4px;
   background-color: #ffffff;
   border-radius: 2px;
+  transition: height 0.3s ease-in-out;
+  min-height: 10px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
 /* Animations */
@@ -95,6 +115,24 @@
   0% { transform: scale(0.8); opacity: 0.5; }
   50% { transform: scale(1); opacity: 1; }
   100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+@keyframes voice-ai-pulse-fast {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+@keyframes voice-ai-pulse-responding {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0.85); opacity: 0.7; }
+}
+
+@keyframes voice-ai-container-pulse {
+  0% { opacity: 0.85; }
+  50% { opacity: 1; }
+  100% { opacity: 0.85; }
 }
 
 @keyframes voice-ai-thinking {
@@ -172,7 +210,8 @@
   
   .voice-ai-idle-animation,
   .voice-ai-thinking-animation,
-  .voice-ai-responding-animation {
+  .voice-ai-responding-animation,
+  .voice-ai-loading-animation {
     width: 28px;
     height: 28px;
   }
@@ -186,7 +225,8 @@
   
   .voice-ai-idle-animation,
   .voice-ai-thinking-animation,
-  .voice-ai-responding-animation {
+  .voice-ai-responding-animation,
+  .voice-ai-loading-animation {
     width: 24px;
     height: 24px;
   }

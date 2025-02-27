@@ -435,108 +435,152 @@
         const button = this.ui.button;
         const buttonContainer = this.ui.animationContainer;
         const statusText = this.ui.container.querySelector('.voice-ai-status');
-        const microphoneImg = this.ui.idleAnimation.querySelector('img');
+        const microphoneImg = this.ui.idleAnimation?.querySelector('img');
         
         if (!button || !buttonContainer) return;
         
-        // Reset all classes
-        button.classList.remove(
-          'voice-ai-active',
-          'voice-ai-thinking',
-          'voice-ai-responding',
-          'voice-ai-error'
-        );
-        
-        // Hide/show microphone based on mode
-        if (microphoneImg) {
-          if (mode === 'inactive' || mode === 'idle') {
-            microphoneImg.style.display = 'block';
-          } else {
-            microphoneImg.style.display = 'none';
-          }
+        // Clear existing animations
+        while (buttonContainer.firstChild) {
+          buttonContainer.removeChild(buttonContainer.firstChild);
         }
         
         // Update UI based on mode
         switch (mode) {
+          case 'loading':
+            // Show loading animation (pulsing white circle)
+            const loadingAnimation = document.createElement('div');
+            loadingAnimation.className = 'voice-ai-loading-animation';
+            buttonContainer.appendChild(loadingAnimation);
+            if (statusText) statusText.textContent = 'Connecting...';
+            break;
+            
           case 'active':
-            button.classList.add('voice-ai-active');
+            // When active, immediately show volume visualization with minimum height
+            // This ensures we always see something when in listening mode
+            const activeVolumeContainer = document.createElement('div');
+            activeVolumeContainer.className = 'voice-ai-volume-container';
+            
+            // Create volume bars with minimum height
+            for (let i = 0; i < 4; i++) {
+              const bar = document.createElement('div');
+              bar.className = 'voice-ai-volume-bar';
+              bar.style.width = '4px';
+              bar.style.backgroundColor = '#ffffff';
+              bar.style.borderRadius = '2px';
+              bar.style.height = '10px'; // Minimum height
+              bar.style.transition = 'height 0.3s ease-in-out';
+              activeVolumeContainer.appendChild(bar);
+            }
+            
+            buttonContainer.appendChild(activeVolumeContainer);
+            this.ui.volumeBars = Array.from(activeVolumeContainer.querySelectorAll('.voice-ai-volume-bar'));
+            
             if (statusText) statusText.textContent = 'Listening...';
             break;
             
           case 'thinking':
-            button.classList.add('voice-ai-thinking');
+            // Show thinking animation (spinning circle)
+            const thinkingAnimation = document.createElement('div');
+            thinkingAnimation.className = 'voice-ai-thinking-animation';
+            buttonContainer.appendChild(thinkingAnimation);
             if (statusText) statusText.textContent = 'Thinking...';
             break;
             
           case 'responding':
-            button.classList.add('voice-ai-responding');
+            // Show responding animation (pulsing white circle)
+            const respondingAnimation = document.createElement('div');
+            respondingAnimation.className = 'voice-ai-responding-animation';
+            buttonContainer.appendChild(respondingAnimation);
             if (statusText) statusText.textContent = 'Responding...';
             break;
             
           case 'error':
-            button.classList.add('voice-ai-error');
+            // Show error state
+            const errorAnimation = document.createElement('div');
+            errorAnimation.className = 'voice-ai-idle-animation';
+            errorAnimation.style.backgroundColor = '#ff3b30';
+            buttonContainer.appendChild(errorAnimation);
             if (statusText) statusText.textContent = 'Error';
             break;
             
           case 'volume':
-            button.classList.add('voice-ai-active');
-            if (statusText) statusText.textContent = 'Listening...';
-            
-            // Handle volume visualization
-            let volumeIndicator = this.ui.animationContainer.querySelector('.voice-ai-volume-indicator');
-            
-            if (!volumeIndicator) {
-              // Create volume visualization if it doesn't exist
-              volumeIndicator = document.createElement('div');
-              volumeIndicator.className = 'voice-ai-volume-indicator';
-              volumeIndicator.style.display = 'flex';
-              volumeIndicator.style.justifyContent = 'center';
-              volumeIndicator.style.alignItems = 'flex-end';
-              volumeIndicator.style.height = '50px';
-              volumeIndicator.style.gap = '5px';
-              volumeIndicator.style.position = 'absolute';
-              volumeIndicator.style.bottom = '80px';
-              volumeIndicator.style.left = '50%';
-              volumeIndicator.style.transform = 'translateX(-50%)';
+            // If we already have volume bars, just update their heights
+            if (this.ui.volumeBars && this.ui.volumeBars.length > 0 && buttonContainer.querySelector('.voice-ai-volume-container')) {
+              // Update existing volume bars
+              this.ui.volumeBars.forEach((bar, i) => {
+                // Ensure minimum height and add slight randomness for visual effect
+                const randomFactor = 0.9 + Math.random() * 0.2;
+                // Ensure a minimum height so bars are always visible
+                const minHeight = 10;
+                const maxHeight = 30;
+                // Calculate target height with a higher minimum to ensure visibility
+                const targetHeight = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
+                
+                // Get current height
+                const currentStyle = window.getComputedStyle(bar);
+                const currentHeight = parseInt(currentStyle.height, 10);
+                
+                // Smooth transition (70% current, 30% target)
+                const smoothedHeight = currentHeight * 0.7 + targetHeight * 0.3;
+                
+                bar.style.height = `${smoothedHeight}px`;
+              });
+            } else {
+              // Create new volume container and bars
+              const volContainer = document.createElement('div');
+              volContainer.className = 'voice-ai-volume-container';
+              this.ui.volumeBars = [];
               
               // Create volume bars
               for (let i = 0; i < 4; i++) {
                 const bar = document.createElement('div');
                 bar.className = 'voice-ai-volume-bar';
                 bar.style.width = '4px';
-                bar.style.backgroundColor = '#3b82f6';
+                bar.style.backgroundColor = '#ffffff';
                 bar.style.borderRadius = '2px';
-                bar.style.height = '10px';
-                bar.style.transition = 'height 0.1s ease';
-                volumeIndicator.appendChild(bar);
+                bar.style.transition = 'height 0.3s ease-in-out';
+                
+                // Ensure minimum height and add slight randomness for visual effect
+                const randomFactor = 0.9 + Math.random() * 0.2;
+                // Ensure a minimum height so bars are always visible
+                const minHeight = 10;
+                const maxHeight = 30;
+                // Calculate height with a higher minimum to ensure visibility
+                const height = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
+                
+                bar.style.height = `${height}px`;
+                
+                volContainer.appendChild(bar);
+                this.ui.volumeBars.push(bar);
               }
               
-              // Add to container
-              buttonContainer.appendChild(volumeIndicator);
+              buttonContainer.appendChild(volContainer);
             }
             
-            // Update volume bars
-            const bars = volumeIndicator.querySelectorAll('.voice-ai-volume-bar');
-            bars.forEach(bar => {
-              // Randomize heights slightly for visual effect
-              const randomFactor = 0.8 + Math.random() * 0.4;
-              const height = Math.max(10, Math.min(50, volume * 500 * randomFactor));
-              bar.style.height = `${height}px`;
-            });
-            
-            volumeIndicator.style.display = 'flex';
+            if (statusText) statusText.textContent = 'Listening...';
             break;
             
           case 'inactive':
           case 'idle':
           default:
-            if (statusText) statusText.textContent = 'Click to talk';
+            // Show idle animation (microphone icon)
+            const idleAnimation = document.createElement('div');
+            idleAnimation.className = 'voice-ai-idle-animation';
             
-            // Hide volume indicator if it exists
-            const volIndicator = this.ui.animationContainer.querySelector('.voice-ai-volume-indicator');
-            if (volIndicator) {
-              volIndicator.style.display = 'none';
-            }
+            // Add microphone icon
+            const micIcon = document.createElement('img');
+            micIcon.src = `${this.config.serverUrl || ''}/microphone.svg`;
+            micIcon.alt = 'Microphone';
+            micIcon.style.width = '24px';
+            micIcon.style.height = '24px';
+            
+            idleAnimation.appendChild(micIcon);
+            buttonContainer.appendChild(idleAnimation);
+            
+            // Store reference to idle animation
+            this.ui.idleAnimation = idleAnimation;
+            
+            if (statusText) statusText.textContent = 'Click to talk';
             break;
         }
       }
@@ -618,11 +662,11 @@
       _onDataChannelOpen() {
         console.log('Voice AI SDK: Data channel opened');
         
-        // Configure session
+        // Configure data channel
         this._configureDataChannel();
         
-        // Update UI
-        this._updateUI('idle');
+        // Update UI to active state
+        this._updateUI('active');
       }
   
       /**
@@ -711,59 +755,80 @@
        */
       _onDataChannelMessage(event) {
         try {
-          // Handle empty messages
-          if (!event.data) {
-            console.warn('Voice AI SDK: Received empty message');
-            return;
-          }
-          
-          // Parse the message
           const message = JSON.parse(event.data);
-          
-          // Handle messages without type
-          if (!message.type) {
-            console.warn('Voice AI SDK: Received message without type', message);
-            return;
-          }
-          
-          console.log('Voice AI SDK: Received message', message.type);
-          
-          // Add the message to the messages array
-          this.messages.push(message);
+          console.log('Voice AI SDK: Received message', message);
           
           // Handle different message types
           switch (message.type) {
-            case 'input_audio_buffer.speech_started':
-              console.log('Voice AI SDK: Speech started');
+            case 'thinking':
+              // Update UI to thinking state
               this._updateUI('thinking');
               break;
               
-            case 'conversation.item.created':
-              console.log('Voice AI SDK: Conversation item created');
+            case 'responding':
+              // Update UI to responding state (pulsing white circle)
               this._updateUI('responding');
               break;
               
-            case 'conversation.item.completed':
-              console.log('Voice AI SDK: Conversation item completed');
-              this._updateUI('idle');
+            case 'response':
+              // Add message to history
+              this.messages.push({
+                role: 'assistant',
+                content: message.content
+              });
+              
+              // Call onMessage callback
+              if (typeof this.config.onMessage === 'function') {
+                this.config.onMessage({
+                  role: 'assistant',
+                  content: message.content
+                });
+              }
+              
+              // Update UI to active state (listening mode)
+              this._updateUI('active');
               break;
               
-            case 'response.function_call_arguments.done':
-              console.log('Voice AI SDK: Function call arguments done');
-              // Handle function calls if needed
+            case 'error':
+              console.error('Voice AI SDK: Error from server', message.error);
+              
+              // Call onError callback
+              if (typeof this.config.onError === 'function') {
+                this.config.onError(new Error(message.error));
+              }
+              
+              // Update UI to error state
+              this._updateUI('error');
+              break;
+              
+            // Handle specific OpenAI WebSocket message types
+            case 'input_audio_buffer.speech_started':
+              // User started speaking - show volume visualization
+              this._updateUI('volume', this.currentVolume || 0.1);
+              break;
+              
+            case 'input_audio_buffer.speech_ended':
+              // User stopped speaking - keep showing volume visualization with minimum level
+              this._updateUI('active');
+              break;
+              
+            case 'output_audio_buffer.started':
+              // Agent started speaking
+              this._updateUI('responding');
+              break;
+              
+            case 'output_audio_buffer.ended':
+              // Agent stopped speaking - go back to volume visualization
+              this._updateUI('active');
               break;
               
             default:
-              // No special handling for other message types
+              // For any other message, if we're in active mode, ensure volume visualization is shown
+              if (this.isActive && this.isListening && this.uiMode !== 'responding') {
+                this._updateUI('volume', this.currentVolume || 0.1);
+              }
               break;
           }
-          
-          // Dispatch an event for external listeners
-          const customEvent = new CustomEvent('voice-ai-message', {
-            detail: { message }
-          });
-          window.dispatchEvent(customEvent);
-          
         } catch (error) {
           console.error('Voice AI SDK: Error parsing message', error);
         }
@@ -832,8 +897,7 @@
        * @private
        */
       _cleanupWebRTC() {
-        // Stop volume detection
-        this._stopVolumeDetection();
+        console.log('Voice AI SDK: Cleaning up WebRTC resources');
         
         // Close data channel
         if (this.dataChannel) {
@@ -849,22 +913,17 @@
         
         // Stop media stream
         if (this.mediaStream) {
-          this.mediaStream.getTracks().forEach(track => track.stop());
+          this.mediaStream.getTracks().forEach(track => {
+            track.stop();
+          });
           this.mediaStream = null;
         }
         
-        // Close audio context
-        if (this.audioContext) {
-          this.audioContext.close().catch(console.error);
-          this.audioContext = null;
-          this.analyser = null;
-        }
-        
         // Reset state
+        this.isActive = false;
         this.isListening = false;
-        this.currentVolume = 0;
         
-        // Update UI
+        // Update UI to idle state
         this._updateUI('idle');
       }
   
@@ -876,8 +935,16 @@
         if (this.isActive) return;
         
         try {
+          // Show loading state immediately
+          this._updateUI('loading');
+          
           // Initialize WebRTC
-          await this._initWebRTC();
+          const webrtcInitialized = await this._initWebRTC();
+          
+          if (!webrtcInitialized) {
+            this._updateUI('error');
+            return;
+          }
           
           // Configure session
           await this._configureSession();
@@ -885,6 +952,9 @@
           // Set active state
           this.isActive = true;
           this.isListening = true;
+          
+          // Update UI to active state
+          this._updateUI('active');
           
           // Call onStart callback
           if (typeof this.config.onStart === 'function') {
@@ -895,6 +965,9 @@
           
           // Clean up resources
           this._cleanupWebRTC();
+          
+          // Update UI to error state
+          this._updateUI('error');
           
           // Call onError callback
           if (typeof this.config.onError === 'function') {
@@ -932,8 +1005,13 @@
         // Clean up WebRTC resources
         this._cleanupWebRTC();
         
-        // Set active state
+        // Reset state
         this.isActive = false;
+        this.isListening = false;
+        this.currentVolume = 0;
+        
+        // Update UI to idle state
+        this._updateUI('idle');
         
         // Call onEnd callback
         if (typeof this.config.onEnd === 'function') {
@@ -949,6 +1027,9 @@
         if (this.isActive) {
           this.stopSession();
         } else {
+          // Show loading animation immediately
+          this._updateUI('loading');
+          // Start session
           this.startSession();
         }
       }
@@ -1027,6 +1108,9 @@
           const bufferLength = analyser.frequencyBinCount;
           const dataArray = new Uint8Array(bufferLength);
           
+          // Store previous volume values for smoothing
+          this.volumeHistory = Array(5).fill(0.1); // Start with a small non-zero value
+          
           const getVolume = () => {
             analyser.getByteTimeDomainData(dataArray);
             
@@ -1036,24 +1120,34 @@
               sum += float * float;
             }
             
-            return Math.sqrt(sum / dataArray.length);
+            const rawVolume = Math.sqrt(sum / dataArray.length);
+            
+            // Add to history and calculate smoothed volume
+            this.volumeHistory.push(rawVolume);
+            this.volumeHistory.shift();
+            
+            // Calculate weighted average (more recent values have higher weight)
+            let weightedSum = 0;
+            let weightSum = 0;
+            for (let i = 0; i < this.volumeHistory.length; i++) {
+              const weight = i + 1;
+              weightedSum += this.volumeHistory[i] * weight;
+              weightSum += weight;
+            }
+            
+            // Ensure we always return at least a minimum value
+            return Math.max(0.05, weightedSum / weightSum);
           };
           
           // Start volume detection interval
           this.volumeInterval = setInterval(() => {
-            const volume = getVolume();
-            
-            // Update UI based on volume
-            if (volume > 0.02) {
+            // Only update volume visualization if we're in active or volume mode
+            if (this.isActive && this.isListening && this.uiMode !== 'responding') {
+              const volume = getVolume();
+              
+              // Always show volume visualization when listening
+              // with a minimum volume level to ensure bars are visible
               this._updateUI('volume', volume);
-            } else if (this.uiMode === 'volume') {
-              // Delay switching back to idle to prevent flickering
-              if (!this.volumeTimeout) {
-                this.volumeTimeout = setTimeout(() => {
-                  this._updateUI('idle');
-                  this.volumeTimeout = null;
-                }, 500);
-              }
             }
           }, 100);
           
@@ -1075,6 +1169,11 @@
         const bufferLength = this.analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         
+        // Initialize volume history for smoothing if not already done
+        if (!this.volumeHistory) {
+          this.volumeHistory = Array(5).fill(0);
+        }
+        
         this.volumeInterval = setInterval(() => {
           if (!this.analyser) return;
           
@@ -1085,12 +1184,27 @@
             sum += dataArray[i];
           }
           
-          this.currentVolume = sum / bufferLength / 255;
+          const rawVolume = sum / bufferLength / 255;
+          
+          // Add to history and calculate smoothed volume
+          this.volumeHistory.push(rawVolume);
+          this.volumeHistory.shift();
+          
+          // Calculate weighted average (more recent values have higher weight)
+          let weightedSum = 0;
+          let weightSum = 0;
+          for (let i = 0; i < this.volumeHistory.length; i++) {
+            const weight = i + 1;
+            weightedSum += this.volumeHistory[i] * weight;
+            weightSum += weight;
+          }
+          
+          this.currentVolume = weightedSum / weightSum;
           
           if (this.isListening && this.currentVolume > 0.02) {
-            this._updateUI('volume');
-          } else if (this.mode === 'volume') {
-            this._updateUI('idle');
+            this._updateUI('volume', this.currentVolume);
+          } else if (this.uiMode === 'volume') {
+            this._updateUI('active');
           }
         }, 100);
       }

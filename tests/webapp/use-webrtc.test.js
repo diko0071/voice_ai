@@ -9,7 +9,7 @@ const path = require('path');
 const assert = require('assert');
 
 // Read the hook file
-const hookPath = path.join(__dirname, '../../hooks/use-webrtc.ts');
+const hookPath = path.join(__dirname, '../../hooks/webapp/use-webrtc.ts');
 const hookContent = fs.readFileSync(hookPath, 'utf8');
 
 // Basic test to verify the hook exists and contains expected elements

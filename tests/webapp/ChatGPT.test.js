@@ -10,7 +10,7 @@ const assert = require('assert');
 const { JSDOM } = require('jsdom');
 
 // Read the component file
-const componentPath = path.join(__dirname, '../../app/chatgpt.tsx');
+const componentPath = path.join(__dirname, '../../components/webapp/ChatGPT.tsx');
 const componentContent = fs.readFileSync(componentPath, 'utf8');
 
 // Basic test to verify the component exists and contains expected elements

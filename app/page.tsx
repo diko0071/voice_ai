@@ -1,5 +1,5 @@
 "use client";
-import ChatGPT from "@/app/chatgpt";
+import ChatGPT from "@/components/webapp/ChatGPT";
 
 export default function Home() {
   return (

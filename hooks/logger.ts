@@ -9,7 +9,7 @@ interface LogData {
 class Logger {
   private async writeToFile(logData: LogData) {
     try {
-      await fetch('/api/log', {
+      await fetch('/api/internal/log', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

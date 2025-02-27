@@ -13,7 +13,7 @@ console.log('Running API routes tests...');
 
 try {
   // Test session route
-  const sessionRoutePath = path.join(__dirname, '../../app/api/session/route.ts');
+  const sessionRoutePath = path.join(__dirname, '../../app/api/internal/session/route.ts');
   const sessionRouteContent = fs.readFileSync(sessionRoutePath, 'utf8');
 
   assert(sessionRouteContent.includes('POST'), 'Session route should handle POST requests');
@@ -21,7 +21,7 @@ try {
   assert(sessionRouteContent.includes('OPENAI_API_KEY'), 'Session route should use OPENAI_API_KEY');
   
   // Test log route
-  const logRoutePath = path.join(__dirname, '../../app/api/log/route.ts');
+  const logRoutePath = path.join(__dirname, '../../app/api/internal/log/route.ts');
   const logRouteContent = fs.readFileSync(logRoutePath, 'utf8');
 
   assert(logRouteContent.includes('POST'), 'Log route should handle POST requests');

@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import useWebRTCAudioSession from "@/hooks/use-webrtc";
+import useWebRTCAudioSession from "@/hooks/webapp/use-webrtc";
  
 const ChatGPT: React.FC = () => {
   const { currentVolume, isSessionActive, handleStartStopClick, msgs } =

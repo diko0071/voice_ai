@@ -19,6 +19,7 @@
     "standardized-audio-context": "^25.3.77"
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.23.3",
     "@types/jest": "^29.5.12",
     "@types/node": "^20",
     "@types/react": "^19",

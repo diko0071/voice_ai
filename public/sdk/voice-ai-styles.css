@@ -1,0 +1,188 @@
+/**
+ * Voice AI SDK Styles
+ * @version 1.0.0
+ */
+
+/* Container */
+.voice-ai-container {
+  position: fixed;
+  z-index: 9999;
+}
+
+/* Button */
+.voice-ai-button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: #3a86ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.voice-ai-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.voice-ai-button:active {
+  transform: scale(0.95);
+}
+
+/* Animation Container */
+.voice-ai-animation {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Idle Animation */
+.voice-ai-idle-animation {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  opacity: 0.8;
+  animation: voice-ai-pulse 2s infinite;
+}
+
+/* Thinking Animation */
+.voice-ai-thinking-animation {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  border-top-color: transparent;
+  animation: voice-ai-thinking 1s infinite linear;
+}
+
+/* Responding Animation */
+.voice-ai-responding-animation {
+  width: 32px;
+  height: 32px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  animation: voice-ai-pulse 2s infinite;
+}
+
+/* Volume Animation */
+.voice-ai-volume-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 32px;
+}
+
+.voice-ai-volume-bar {
+  width: 4px;
+  background-color: #ffffff;
+  border-radius: 2px;
+}
+
+/* Animations */
+@keyframes voice-ai-pulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+@keyframes voice-ai-thinking {
+  0% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(180deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+@keyframes voice-ai-volume {
+  0% { height: 10px; }
+  50% { height: 30px; }
+  100% { height: 10px; }
+}
+
+/* Theme: Light */
+.voice-ai-theme-light .voice-ai-button {
+  background-color: #3a86ff;
+}
+
+.voice-ai-theme-light .voice-ai-idle-animation,
+.voice-ai-theme-light .voice-ai-thinking-animation,
+.voice-ai-theme-light .voice-ai-volume-bar {
+  background-color: #ffffff;
+}
+
+/* Theme: Dark */
+.voice-ai-theme-dark .voice-ai-button {
+  background-color: #2b2b2b;
+}
+
+.voice-ai-theme-dark .voice-ai-idle-animation,
+.voice-ai-theme-dark .voice-ai-thinking-animation,
+.voice-ai-theme-dark .voice-ai-volume-bar {
+  background-color: #f0f0f0;
+}
+
+/* Theme: Brand */
+.voice-ai-theme-brand .voice-ai-button {
+  background-color: #ff5a5f;
+}
+
+.voice-ai-theme-brand .voice-ai-idle-animation,
+.voice-ai-theme-brand .voice-ai-thinking-animation,
+.voice-ai-theme-brand .voice-ai-volume-bar {
+  background-color: #ffffff;
+}
+
+/* Positions */
+.voice-ai-position-bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+.voice-ai-position-bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.voice-ai-position-top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.voice-ai-position-top-left {
+  top: 20px;
+  left: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .voice-ai-button {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .voice-ai-idle-animation,
+  .voice-ai-thinking-animation,
+  .voice-ai-responding-animation {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .voice-ai-button {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .voice-ai-idle-animation,
+  .voice-ai-thinking-animation,
+  .voice-ai-responding-animation {
+    width: 24px;
+    height: 24px;
+  }
+} 

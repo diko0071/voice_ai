@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import useWebRTCAudioSession from "@/hooks/use-webrtc";
+import useWebRTCAudioSession from "@/hooks/webapp/use-webrtc";
  
 const ChatGPT: React.FC = () => {
   const { currentVolume, isSessionActive, handleStartStopClick, msgs } =
@@ -21,7 +21,7 @@ const ChatGPT: React.FC = () => {
   }, []);
  
   useEffect(() => {
-    if (!isSessionActive) return;
+    if (!isSessionActive || !isClient) return;
  
     if (currentVolume > 0.02) {
       if (silenceTimeoutRef.current) {
@@ -65,6 +65,17 @@ const ChatGPT: React.FC = () => {
       setVolumeLevels([0, 0, 0, 0]);
     }
   }, [msgs, isSessionActive, currentEventIndex]);
+ 
+  // If not client-side yet, render a simple loading state to prevent hydration mismatch
+  if (!isClient) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+        <div className="relative w-64 h-64 flex items-center justify-center">
+          <div className="bg-foreground rounded-full" style={{ width: 54, height: 54 }} />
+        </div>
+      </div>
+    );
+  }
  
   return (
     <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer" onClick={handleStartStopClick}>
@@ -120,7 +131,8 @@ const ChatGPT: React.FC = () => {
           // Responding animation
           <div className="flex space-x-2 items-center justify-center h-full">
             {volumeLevels.map((level, index) => {
-              const height = Math.max(50, Math.min(100, level * (10 * (isClient ? Math.random() : 0.5))));
+              // Only use random values on the client side
+              const height = Math.max(50, Math.min(100, level * 10));
               return (
                 <motion.div
                   key={index}
@@ -132,11 +144,11 @@ const ChatGPT: React.FC = () => {
                   animate={{ height }}
                   transition={{
                     type: "spring",
-                    stiffness: 300 + (isClient ? Math.random() * 50 : 25),
-                    damping: 10 + (isClient ? Math.random() * 2 : 1),
-                    mass: 0.8 + (isClient ? Math.random() * 0.2 : 0.1),
-                    velocity: 2 + (isClient ? Math.random() * 1.5 : 0.75),
-                    restSpeed: 0.5 + (isClient ? Math.random() * 0.1 : 0.05)
+                    stiffness: 300,
+                    damping: 10,
+                    mass: 0.8,
+                    velocity: 2,
+                    restSpeed: 0.5
                   }}
                 />
               );

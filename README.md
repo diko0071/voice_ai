@@ -1,8 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Voice AI: Voice Control Assistant
+
+[![Tests](https://github.com/improvado/voice_ai/actions/workflows/tests.yml/badge.svg)](https://github.com/improvado/voice_ai/actions/workflows/tests.yml)
+
+This is a [Next.js](https://nextjs.org) project that provides a voice control assistant with WebRTC and OpenAI integration. The project includes a JavaScript SDK that can be embedded on any website to enable voice command functionality.
+
+## Features
+
+- Voice command processing via WebRTC
+- Server-side OpenAI integration for enhanced security
+- JavaScript SDK for easy integration into any website
+- Customizable UI with multiple themes and positions
+- Session management and client validation
+- Comprehensive logging system
 
 ## Getting Started
 
-First, run the development server:
+First, clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/your-username/voice-ai.git
+cd voice-ai
+npm install
+```
+
+Create a `.env.local` file based on the `.env.example` template and add your OpenAI API key:
+
+```
+OPENAI_API_KEY=your_openai_api_key
+# Additional environment variables as specified in .env.example
+```
+
+Then, run the development server:
 
 ```bash
 npm run dev
@@ -10,27 +38,96 @@ npm run dev
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/` - Next.js App Router code
+  - `page.tsx` - Entry point, renders ChatGPT component
+  - `layout.tsx` - Root layout
+  - `globals.css` - Global styles
+  - `chatgpt.tsx` - OpenAI voice processing
+  - `api/` - Backend endpoints
+    - `log/` - Application logging
+    - `session/` - Session management
+    - `v1/` - API endpoints for SDK
+      - `voice/process/` - WebRTC offer processing
+      - `auth/validate/` - Client validation
+      - `sessions/` - Session management
+- `hooks/` - Custom React hooks
+  - `use-webrtc.ts` - Voice capture via WebRTC
+  - `logger.ts` - Logging utilities
+- `lib/` - Utility libraries
+  - `security.ts` - Client validation utilities
+  - `sessions.ts` - Session management utilities
+  - `openai-webrtc.ts` - Server-side OpenAI WebRTC integration
+  - `openai-sessions.ts` - OpenAI session management
+- `prompts/` - OpenAI prompt templates
+  - `agent-instructions.ts` - Instructions for the voice assistant
+- `public/sdk/` - JavaScript SDK files
+  - `voice-ai-sdk.js` - Main SDK file
+  - `voice-ai-sdk.min.js` - Minified SDK for production
+  - `voice-ai-styles.css` - SDK styles
+  - `demo.html` - Demo page for SDK
+
+## SDK Integration
+
+The Voice AI SDK can be easily integrated into any website. For detailed integration instructions, see the [INTEGRATION.md](INTEGRATION.md) file.
+
+Basic integration example:
+
+```html
+<!-- Include the SDK -->
+<script src="https://your-domain.com/sdk/voice-ai-sdk.min.js"></script>
+<link rel="stylesheet" href="https://your-domain.com/sdk/voice-ai-styles.css">
+
+<!-- Initialize the SDK -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    window.VoiceAI.init({
+      clientId: 'your_client_id',
+      serverUrl: 'https://your-voice-ai-server.com',
+      position: 'bottom-right',
+      theme: 'light'
+    });
+  });
+</script>
+```
+
+## Server-Side OpenAI Integration
+
+This project uses a server-side approach for OpenAI integration, which provides several benefits:
+
+1. **Enhanced Security**: The OpenAI API key is kept securely on the server and never exposed to the client.
+2. **Centralized Control**: All interactions with OpenAI are managed by the server, allowing for monitoring and logging.
+3. **Simplified Client**: The client SDK only needs to handle WebRTC connection setup and UI management.
+
+For more details on the server-side integration, see [SERVER_SIDE_INTEGRATION.md](SERVER_SIDE_INTEGRATION.md).
+
+## Demo
+
+A demo page is available at [http://localhost:3000/sdk/demo.html](http://localhost:3000/sdk/demo.html) when running the development server. This demo showcases the SDK's features and allows you to test different configurations.
+
+## Testing
+
+The project uses Jest for testing. To run the tests locally:
+
+```bash
+npm test
+```
+
+Tests are automatically run on GitHub Actions for every pull request and push to the main branch. The test status is displayed in the badge at the top of this README.
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+To learn more about the technologies used in this project:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API
+- [WebRTC API](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) - Web Real-Time Communication
+- [OpenAI API](https://platform.openai.com/docs/api-reference) - OpenAI API reference
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)

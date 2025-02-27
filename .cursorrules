@@ -1,35 +1,74 @@
 # Voice AI: Voice Control Assistant
 
 ## Overview
-Next.js app with voice commands via WebRTC and OpenAI.
+Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK for website integration.
 
 ## Structure
 - `app/` - Next.js App Router code
-  - `page.tsx` - Entry point, renders ChatGPT component
+  - `page.tsx` - Entry point for the web application
   - `layout.tsx` - Root layout
   - `globals.css` - Global styles
-  - `chatgpt.tsx` - OpenAI voice processing
   - `api/` - Backend endpoints
     - `log/` - Application logging
+    - `session/` - Session management
+    - `internal/` - Internal API endpoints
+      - `log/` - Internal logging
+      - `session/` - Internal session management
+    - `v1/` - API endpoints for SDK
+      - `auth/validate/` - Client validation
+      - `instructions/` - Voice assistant instructions
+      - `sessions/` - Session management
+      - `voice/token/` - Voice processing tokens
+- `components/` - React components
+  - `webapp/` - Web application components
+    - `ChatGPT.tsx` - OpenAI voice processing component
 - `hooks/` - Custom React hooks
-  - `use-webrtc.ts` - Voice capture via WebRTC
   - `logger.ts` - Logging utilities
+  - `webapp/` - Web application hooks
+    - `use-webrtc.ts` - Voice capture via WebRTC
+- `lib/` - Utility libraries
+  - `security.ts` - Client validation
+  - `sessions.ts` - Session management
+- `prompts/` - OpenAI prompt templates
+  - `agent-instructions.ts` - Instructions for the voice assistant
 - `public/` - Static assets
-- `.env.local` - Environment variables
+  - `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` - UI icons
+  - `sdk/` - Voice AI SDK files
+    - `demo.html` - SDK demo page
+    - `voice-ai-sdk.js` - Main SDK
+    - `voice-ai-sdk.min.js` - Minified SDK
+    - `voice-ai-styles.css` - SDK styles
+- `scripts/` - Utility scripts
+  - `deploy-sdk.sh` - SDK deployment script
+- `tests/` - Test files
+- `dist/` - Distribution files (in gitignore, but shown for reference)
+  - `sdk/` - Compiled SDK files
+    - `README.md` - SDK documentation
+    - `demo.html` - SDK demo page
+    - `version.json` - SDK version information
+    - `voice-ai-sdk.min.js` - Minified SDK
+    - `voice-ai-styles.css` - SDK styles
+- `.env.local` - Environment variables (not committed)
   - `NEXT_PUBLIC_OPENAI_API_KEY` - OpenAI API key
+  - `ALLOWED_CLIENTS` - Authorized clients
+  - `CLIENT_*_DOMAINS` - Allowed domains
 - `next.config.ts` - Next.js config
 - `package.json` - Dependencies
+- `postcss.config.mjs` - PostCSS configuration
 - `tailwind.config.ts` - Styling config
 - `tsconfig.json` - TypeScript config
+- `INTEGRATION.md` - SDK integration guide
+- `README.md` - Project documentation
 
 ## Flow
-1. `page.tsx` → `ChatGPT` component
-2. WebRTC captures voice
-3. ChatGPT processes commands
+1. `page.tsx` → `components/webapp/ChatGPT` component
+2. WebRTC captures voice via `hooks/webapp/use-webrtc.ts`
+3. ChatGPT processes commands using prompts from `prompts/agent-instructions.ts`
 4. Voice assistant responds to user
+5. SDK enables integration on any website
 
 ## Setup
 1. Create `.env.local` from example
-2. Add OpenAI API key
+2. Add OpenAI API key and client configuration
 3. Run `npm run dev`
 4. Open http://localhost:3000 

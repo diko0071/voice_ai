@@ -2,8 +2,8 @@
 "use client";
  
 import { useState, useRef, useEffect } from "react";
-import { logger } from './logger';
-import { agentInstructions } from '../prompts/agent-instructions';
+import { logger } from '../logger';
+import { agentInstructions } from '../../prompts/agent-instructions';
  
 const useWebRTCAudioSession = (voice: string) => {
   const [status, setStatus] = useState("");
@@ -124,7 +124,7 @@ const useWebRTCAudioSession = (voice: string) => {
   }, []);
  
   const getEphemeralToken = async () => {
-    const response = await fetch('/api/session', {
+    const response = await fetch('/api/internal/session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

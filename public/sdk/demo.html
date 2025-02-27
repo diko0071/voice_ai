@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice AI SDK Demo</title>
+  <link rel="stylesheet" href="voice-ai-styles.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: #3a86ff;
+    }
+    
+    p {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: #555;
+    }
+    
+    .demo-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+    
+    h2 {
+      font-size: 1.8rem;
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #3a86ff;
+    }
+    
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      background-color: #3a86ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #2a75e8;
+    }
+    
+    .theme-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .theme-option {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .position-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .log-container {
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      padding: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      margin-top: 20px;
+    }
+    
+    .log-entry {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Voice AI SDK Demo</h1>
+      <p>This demo showcases the Voice AI SDK integration. Click the floating button to start a voice conversation.</p>
+    </header>
+    
+    <div class="demo-section">
+      <h2>Controls</h2>
+      <div class="controls">
+        <button id="startButton">Start Session</button>
+        <button id="stopButton">Stop Session</button>
+        <button id="toggleButton">Toggle Session</button>
+      </div>
+      
+      <h2>Customization</h2>
+      <div>
+        <h3>Theme</h3>
+        <div class="theme-selector">
+          <div class="theme-option">
+            <input type="radio" id="themeLight" name="theme" value="light" checked>
+            <label for="themeLight">Light</label>
+          </div>
+          <div class="theme-option">
+            <input type="radio" id="themeDark" name="theme" value="dark">
+            <label for="themeDark">Dark</label>
+          </div>
+          <div class="theme-option">
+            <input type="radio" id="themeBrand" name="theme" value="brand">
+            <label for="themeBrand">Brand</label>
+          </div>
+        </div>
+        
+        <h3>Position</h3>
+        <div class="position-selector">
+          <div class="theme-option">
+            <input type="radio" id="posBottomRight" name="position" value="bottom-right" checked>
+            <label for="posBottomRight">Bottom Right</label>
+          </div>
+          <div class="theme-option">
+            <input type="radio" id="posBottomLeft" name="position" value="bottom-left">
+            <label for="posBottomLeft">Bottom Left</label>
+          </div>
+          <div class="theme-option">
+            <input type="radio" id="posTopRight" name="position" value="top-right">
+            <label for="posTopRight">Top Right</label>
+          </div>
+          <div class="theme-option">
+            <input type="radio" id="posTopLeft" name="position" value="top-left">
+            <label for="posTopLeft">Top Left</label>
+          </div>
+        </div>
+      </div>
+      
+      <h2>Event Log</h2>
+      <div class="log-container" id="logContainer"></div>
+    </div>
+    
+    <footer>
+      <p>Voice AI SDK Demo &copy; 2023 Improvado</p>
+    </footer>
+  </div>
+  
+  <script src="voice-ai-sdk.js"></script>
+  <script>
+    // Initialize the SDK
+    let voiceAI;
+    let currentTheme = 'light';
+    let currentPosition = 'bottom-right';
+    
+    function initVoiceAI() {
+      // Destroy previous instance if exists
+      if (voiceAI) {
+        if (voiceAI.isActive) {
+          voiceAI.stopSession();
+        }
+        
+        // Remove UI elements
+        const container = document.querySelector('.voice-ai-container');
+        if (container) {
+          container.remove();
+        }
+      }
+      
+      // Initialize new instance
+      voiceAI = window.VoiceAI.init({
+        clientId: 'demo_client',
+        position: currentPosition,
+        theme: currentTheme,
+        serverUrl: window.location.origin,
+        onReady: function() {
+          logEvent('Voice AI is ready');
+        },
+        onStart: function() {
+          logEvent('Voice AI session started');
+        },
+        onEnd: function() {
+          logEvent('Voice AI session ended');
+        },
+        onError: function(error) {
+          logEvent('Error: ' + error.message);
+        }
+      });
+    }
+    
+    // Log events to the UI
+    function logEvent(message) {
+      const logContainer = document.getElementById('logContainer');
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      
+      const timestamp = new Date().toLocaleTimeString();
+      logEntry.textContent = `[${timestamp}] ${message}`;
+      
+      logContainer.appendChild(logEntry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    
+    // Set up event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize Voice AI
+      initVoiceAI();
+      
+      // Button controls
+      document.getElementById('startButton').addEventListener('click', function() {
+        voiceAI.startSession();
+        logEvent('Start button clicked');
+      });
+      
+      document.getElementById('stopButton').addEventListener('click', function() {
+        voiceAI.stopSession();
+        logEvent('Stop button clicked');
+      });
+      
+      document.getElementById('toggleButton').addEventListener('click', function() {
+        voiceAI.toggleSession();
+        logEvent('Toggle button clicked');
+      });
+      
+      // Theme selector
+      const themeRadios = document.querySelectorAll('input[name="theme"]');
+      themeRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+          currentTheme = this.value;
+          logEvent(`Theme changed to ${currentTheme}`);
+          initVoiceAI();
+        });
+      });
+      
+      // Position selector
+      const positionRadios = document.querySelectorAll('input[name="position"]');
+      positionRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+          currentPosition = this.value;
+          logEvent(`Position changed to ${currentPosition}`);
+          initVoiceAI();
+        });
+      });
+    });
+  </script>
+</body>
+</html> 

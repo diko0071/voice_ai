@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npm run test:sdk && npm run test:security",
+    "test:sdk": "node tests/sdk-test.js",
+    "test:security": "node tests/security-test.js",
+    "minify": "uglifyjs public/sdk/voice-ai-sdk.js -o public/sdk/voice-ai-sdk.min.js -c -m",
+    "deploy-sdk": "bash scripts/deploy-sdk.sh"
   },
   "dependencies": {
     "framer-motion": "^12.0.6",
@@ -20,8 +25,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/webpack": "^5.28.5",
+    "jsdom": "^24.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "uglify-js": "^3.17.4"
   }
 }

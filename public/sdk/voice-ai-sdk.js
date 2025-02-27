@@ -486,102 +486,102 @@
             if (statusText) statusText.textContent = 'Thinking...';
             break;
             
-          case 'responding':
-            // Show responding animation (pulsing white circle)
-            const respondingAnimation = document.createElement('div');
-            respondingAnimation.className = 'voice-ai-responding-animation';
-            buttonContainer.appendChild(respondingAnimation);
-            if (statusText) statusText.textContent = 'Responding...';
-            break;
+            case 'responding':
+              // Show responding animation (pulsing white circle)
+              const respondingAnimation = document.createElement('div');
+              respondingAnimation.className = 'voice-ai-responding-animation';
+              buttonContainer.appendChild(respondingAnimation);
+              if (statusText) statusText.textContent = 'Responding...';
+              break;
             
-          case 'error':
-            // Show error state
-            const errorAnimation = document.createElement('div');
-            errorAnimation.className = 'voice-ai-idle-animation';
-            errorAnimation.style.backgroundColor = '#ff3b30';
-            buttonContainer.appendChild(errorAnimation);
-            if (statusText) statusText.textContent = 'Error';
-            break;
+            case 'error':
+              // Show error state
+              const errorAnimation = document.createElement('div');
+              errorAnimation.className = 'voice-ai-idle-animation';
+              errorAnimation.style.backgroundColor = '#ff3b30';
+              buttonContainer.appendChild(errorAnimation);
+              if (statusText) statusText.textContent = 'Error';
+              break;
             
-          case 'volume':
-            // If we already have volume bars, just update their heights
-            if (this.ui.volumeBars && this.ui.volumeBars.length > 0 && buttonContainer.querySelector('.voice-ai-volume-container')) {
-              // Update existing volume bars
-              this.ui.volumeBars.forEach((bar, i) => {
-                // Ensure minimum height and add slight randomness for visual effect
-                const randomFactor = 0.9 + Math.random() * 0.2;
-                // Ensure a minimum height so bars are always visible
-                const minHeight = 10;
-                const maxHeight = 30;
-                // Calculate target height with a higher minimum to ensure visibility
-                const targetHeight = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
+            case 'volume':
+              // If we already have volume bars, just update their heights
+              if (this.ui.volumeBars && this.ui.volumeBars.length > 0 && buttonContainer.querySelector('.voice-ai-volume-container')) {
+                // Update existing volume bars
+                this.ui.volumeBars.forEach((bar, i) => {
+                  // Ensure minimum height and add slight randomness for visual effect
+                  const randomFactor = 0.9 + Math.random() * 0.2;
+                  // Ensure a minimum height so bars are always visible
+                  const minHeight = 10;
+                  const maxHeight = 30;
+                  // Calculate target height with a higher minimum to ensure visibility
+                  const targetHeight = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
+                  
+                  // Get current height
+                  const currentStyle = window.getComputedStyle(bar);
+                  const currentHeight = parseInt(currentStyle.height, 10);
+                  
+                  // Smooth transition (70% current, 30% target)
+                  const smoothedHeight = currentHeight * 0.7 + targetHeight * 0.3;
+                  
+                  bar.style.height = `${smoothedHeight}px`;
+                });
+              } else {
+                // Create new volume container and bars
+                const volContainer = document.createElement('div');
+                volContainer.className = 'voice-ai-volume-container';
+                this.ui.volumeBars = [];
                 
-                // Get current height
-                const currentStyle = window.getComputedStyle(bar);
-                const currentHeight = parseInt(currentStyle.height, 10);
+                // Create volume bars
+                for (let i = 0; i < 4; i++) {
+                  const bar = document.createElement('div');
+                  bar.className = 'voice-ai-volume-bar';
+                  bar.style.width = '4px';
+                  bar.style.backgroundColor = '#ffffff';
+                  bar.style.borderRadius = '2px';
+                  bar.style.transition = 'height 0.3s ease-in-out';
+                  
+                  // Ensure minimum height and add slight randomness for visual effect
+                  const randomFactor = 0.9 + Math.random() * 0.2;
+                  // Ensure a minimum height so bars are always visible
+                  const minHeight = 10;
+                  const maxHeight = 30;
+                  // Calculate height with a higher minimum to ensure visibility
+                  const height = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
+                  
+                  bar.style.height = `${height}px`;
+                  
+                  volContainer.appendChild(bar);
+                  this.ui.volumeBars.push(bar);
+                }
                 
-                // Smooth transition (70% current, 30% target)
-                const smoothedHeight = currentHeight * 0.7 + targetHeight * 0.3;
-                
-                bar.style.height = `${smoothedHeight}px`;
-              });
-            } else {
-              // Create new volume container and bars
-              const volContainer = document.createElement('div');
-              volContainer.className = 'voice-ai-volume-container';
-              this.ui.volumeBars = [];
-              
-              // Create volume bars
-              for (let i = 0; i < 4; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'voice-ai-volume-bar';
-                bar.style.width = '4px';
-                bar.style.backgroundColor = '#ffffff';
-                bar.style.borderRadius = '2px';
-                bar.style.transition = 'height 0.3s ease-in-out';
-                
-                // Ensure minimum height and add slight randomness for visual effect
-                const randomFactor = 0.9 + Math.random() * 0.2;
-                // Ensure a minimum height so bars are always visible
-                const minHeight = 10;
-                const maxHeight = 30;
-                // Calculate height with a higher minimum to ensure visibility
-                const height = Math.max(minHeight, Math.min(maxHeight, volume * 400 * randomFactor));
-                
-                bar.style.height = `${height}px`;
-                
-                volContainer.appendChild(bar);
-                this.ui.volumeBars.push(bar);
+                buttonContainer.appendChild(volContainer);
               }
               
-              buttonContainer.appendChild(volContainer);
-            }
+              if (statusText) statusText.textContent = 'Listening...';
+              break;
             
-            if (statusText) statusText.textContent = 'Listening...';
-            break;
-            
-          case 'inactive':
-          case 'idle':
-          default:
-            // Show idle animation (microphone icon)
-            const idleAnimation = document.createElement('div');
-            idleAnimation.className = 'voice-ai-idle-animation';
-            
-            // Add microphone icon
-            const micIcon = document.createElement('img');
-            micIcon.src = `${this.config.serverUrl || ''}/microphone.svg`;
-            micIcon.alt = 'Microphone';
-            micIcon.style.width = '24px';
-            micIcon.style.height = '24px';
-            
-            idleAnimation.appendChild(micIcon);
-            buttonContainer.appendChild(idleAnimation);
-            
-            // Store reference to idle animation
-            this.ui.idleAnimation = idleAnimation;
-            
-            if (statusText) statusText.textContent = 'Click to talk';
-            break;
+            case 'inactive':
+            case 'idle':
+            default:
+              // Show idle animation (microphone icon)
+              const idleAnimation = document.createElement('div');
+              idleAnimation.className = 'voice-ai-idle-animation';
+              
+              // Add microphone icon
+              const micIcon = document.createElement('img');
+              micIcon.src = `${this.config.serverUrl || ''}/microphone.svg`;
+              micIcon.alt = 'Microphone';
+              micIcon.style.width = '24px';
+              micIcon.style.height = '24px';
+              
+              idleAnimation.appendChild(micIcon);
+              buttonContainer.appendChild(idleAnimation);
+              
+              // Store reference to idle animation
+              this.ui.idleAnimation = idleAnimation;
+              
+              if (statusText) statusText.textContent = 'Click to talk';
+              break;
         }
       }
   
@@ -644,8 +644,8 @@
           // Save instructions
           this.instructions = data.instructions;
           
-          // Update UI
-          this._updateUI('idle');
+          // Keep the loading state until the data channel opens
+          // The UI will be updated in _onDataChannelOpen
           
           return true;
         } catch (error) {
@@ -662,11 +662,14 @@
       _onDataChannelOpen() {
         console.log('Voice AI SDK: Data channel opened');
         
-        // Configure data channel
-        this._configureDataChannel();
-        
-        // Update UI to active state
-        this._updateUI('active');
+        // Add a small delay before configuring the data channel to ensure connection stability
+        setTimeout(() => {
+          // Configure data channel
+          this._configureDataChannel();
+          
+          // Update UI to responding state immediately, as we expect the assistant to speak first
+          this._updateUI('responding');
+        }, 500);
       }
   
       /**
@@ -725,8 +728,8 @@
                 
                 this.dataChannel.send(JSON.stringify(startPrompt));
                 
-                // Wait again before sending response.create
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Wait longer before sending response.create to ensure stability
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // 3. Request response creation
                 if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -785,8 +788,9 @@
                 });
               }
               
-              // Update UI to active state (listening mode)
-              this._updateUI('active');
+              // Keep responding state until user starts speaking or agent speaks again
+              // This prevents showing the volume visualization prematurely
+              this._updateUI('responding');
               break;
               
             case 'error':
@@ -808,8 +812,9 @@
               break;
               
             case 'input_audio_buffer.speech_ended':
-              // User stopped speaking - keep showing volume visualization with minimum level
-              this._updateUI('active');
+              // User stopped speaking - go back to responding state
+              // This keeps the pulsing circle instead of showing volume bars
+              this._updateUI('responding');
               break;
               
             case 'output_audio_buffer.started':
@@ -818,15 +823,14 @@
               break;
               
             case 'output_audio_buffer.ended':
-              // Agent stopped speaking - go back to volume visualization
-              this._updateUI('active');
+              // Agent stopped speaking - keep responding state
+              // This keeps the pulsing circle instead of showing volume bars
+              this._updateUI('responding');
               break;
               
             default:
-              // For any other message, if we're in active mode, ensure volume visualization is shown
-              if (this.isActive && this.isListening && this.uiMode !== 'responding') {
-                this._updateUI('volume', this.currentVolume || 0.1);
-              }
+              // For any other message, keep the current UI state
+              // Don't automatically switch to volume visualization
               break;
           }
         } catch (error) {
@@ -875,7 +879,7 @@
         switch (this.peerConnection.connectionState) {
           case 'connected':
             console.log('Voice AI SDK: WebRTC connection established');
-            this._updateUI('idle');
+            // Don't update UI here, as it will be handled by the data channel open handler
             break;
             
           case 'disconnected':
@@ -953,8 +957,8 @@
           this.isActive = true;
           this.isListening = true;
           
-          // Update UI to active state
-          this._updateUI('active');
+          // Don't update UI here, as it will be updated in _onDataChannelOpen
+          // The UI will remain in 'loading' state until the data channel opens
           
           // Call onStart callback
           if (typeof this.config.onStart === 'function') {
@@ -1141,14 +1145,15 @@
           
           // Start volume detection interval
           this.volumeInterval = setInterval(() => {
-            // Only update volume visualization if we're in active or volume mode
-            if (this.isActive && this.isListening && this.uiMode !== 'responding') {
+            // Only update volume visualization if we're in volume mode
+            // This ensures we only show volume bars when the user is actually speaking
+            if (this.isActive && this.isListening && this.uiMode === 'volume') {
               const volume = getVolume();
-              
-              // Always show volume visualization when listening
-              // with a minimum volume level to ensure bars are visible
               this._updateUI('volume', volume);
             }
+            
+            // Store current volume for use in other parts of the code
+            this.currentVolume = getVolume();
           }, 100);
           
           this.audioContext = audioContext;
@@ -1201,10 +1206,10 @@
           
           this.currentVolume = weightedSum / weightSum;
           
-          if (this.isListening && this.currentVolume > 0.02) {
+          // Only update UI if we're already in volume mode
+          // This prevents automatically switching to volume visualization
+          if (this.isListening && this.uiMode === 'volume') {
             this._updateUI('volume', this.currentVolume);
-          } else if (this.uiMode === 'volume') {
-            this._updateUI('active');
           }
         }, 100);
       }

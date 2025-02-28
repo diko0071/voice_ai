@@ -984,10 +984,8 @@
               return;
             }
             
-            this.dataChannel.send(JSON.stringify(sessionUpdate));
-            
-            // Wait for a short time to ensure session update is processed
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
+            await this.dataChannel.send(JSON.stringify(sessionUpdate));
             
             // Check if data channel is still open before sending next message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
@@ -1010,10 +1008,8 @@
               }
             };
             
-            this.dataChannel.send(JSON.stringify(startPrompt));
-            
-            // Wait longer before sending response.create to ensure stability
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
+            await this.dataChannel.send(JSON.stringify(startPrompt));
             
             // Check if data channel is still open before sending final message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
@@ -1028,7 +1024,8 @@
               type: 'response.create'
             };
             
-            this.dataChannel.send(JSON.stringify(createResponse));
+            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
+            await this.dataChannel.send(JSON.stringify(createResponse));
           } catch (error) {
             this.logger.error('Error sending messages:', error);
             this._updateUI('error');

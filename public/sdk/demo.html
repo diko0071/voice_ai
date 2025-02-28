@@ -174,6 +174,14 @@
             <label for="posTopLeft">Top Left</label>
           </div>
         </div>
+        
+        <h3>Debug Mode</h3>
+        <div class="debug-selector">
+          <div class="theme-option">
+            <input type="checkbox" id="debugMode" name="debug">
+            <label for="debugMode">Enable Debug Logging</label>
+          </div>
+        </div>
       </div>
       
       <h2>Event Log</h2>
@@ -191,6 +199,7 @@
     let voiceAI;
     let currentTheme = 'light';
     let currentPosition = 'bottom-right';
+    let debugMode = false;
     
     function initVoiceAI() {
       // Destroy previous instance if exists
@@ -211,6 +220,7 @@
         clientId: 'demo_client',
         position: currentPosition,
         theme: currentTheme,
+        debug: debugMode,
         serverUrl: window.location.origin,
         meetingUrl: 'https://calendly.com/improvado-demo/30min',
         onReady: function() {
@@ -280,6 +290,14 @@
           logEvent(`Position changed to ${currentPosition}`);
           initVoiceAI();
         });
+      });
+      
+      // Debug mode toggle
+      const debugCheckbox = document.getElementById('debugMode');
+      debugCheckbox.addEventListener('change', function() {
+        debugMode = this.checked;
+        logEvent(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
+        initVoiceAI();
       });
     });
   </script>

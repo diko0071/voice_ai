@@ -13,7 +13,8 @@
       position: 'bottom-right',
       theme: 'light',
       language: 'en',
-      customStyles: {}
+      customStyles: {},
+      debug: false // Add debug mode option, disabled by default
     };
   
     // SDK Class
@@ -37,6 +38,26 @@
         this.sessionValidationInProgress = false;
         this.meetingUrl = this.config.meetingUrl;
         this.toolHandlers = {};
+        this._startSessionInProgress = false;
+        this.debug = this.config.debug || false; // Store debug mode setting
+        
+        // Add logger methods that respect debug mode
+        this.logger = {
+          log: (message, ...args) => {
+            console.log(message, ...args);
+          },
+          debug: (message, ...args) => {
+            if (this.debug) {
+              console.log(`[DEBUG] ${message}`, ...args);
+            }
+          },
+          error: (message, ...args) => {
+            console.error(message, ...args);
+          },
+          warn: (message, ...args) => {
+            console.warn(message, ...args);
+          }
+        };
         
         // Validate required configuration
         let hasErrors = false;
@@ -422,7 +443,7 @@
         try {
           if (!this.sessionId) {
             // Create a new session
-            console.log('Voice AI SDK: Creating new session');
+            this.logger.log('Creating new session');
             
             // Try up to 3 times with a delay between attempts
             for (let attempt = 1; attempt <= 3; attempt++) {
@@ -441,11 +462,11 @@
                 
                 if (response.ok) {
                   this.sessionId = data.sessionId;
-                  console.log('Voice AI SDK: New session created', this.sessionId);
+                  this.logger.log('New session created', this.sessionId);
                   this._saveSession();
                   
                   // Add a small delay to ensure the session is fully registered on the server
-                  console.log('Voice AI SDK: Waiting for session to be fully registered...');
+                  this.logger.debug('Waiting for session to be fully registered...');
                   await new Promise(resolve => setTimeout(resolve, 500));
                   
                   return;
@@ -453,7 +474,7 @@
                 
                 // If this is not the last attempt, wait before retrying
                 if (attempt < 3) {
-                  console.log(`Voice AI SDK: Session creation failed on attempt ${attempt}, retrying in 1 second...`);
+                  this.logger.debug(`Session creation failed on attempt ${attempt}, retrying in 1 second...`);
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 } else {
                   throw new Error(data.error || 'Failed to create session after 3 attempts');
@@ -461,7 +482,7 @@
               } catch (fetchError) {
                 // If this is not the last attempt, wait before retrying
                 if (attempt < 3) {
-                  console.log(`Voice AI SDK: Session creation error on attempt ${attempt}, retrying in 1 second...`);
+                  this.logger.debug(`Session creation error on attempt ${attempt}, retrying in 1 second...`);
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 } else {
                   throw fetchError;
@@ -469,10 +490,10 @@
               }
             }
           } else {
-            console.log('Voice AI SDK: Using existing session', this.sessionId);
+            this.logger.log('Using existing session', this.sessionId);
           }
         } catch (error) {
-          console.error('Voice AI SDK: Session initialization failed', error);
+          this.logger.error('Session initialization failed', error);
           throw error;
         }
       }
@@ -805,7 +826,7 @@
        */
       async _configureSession() {
         try {
-          console.log('Voice AI SDK: Configuring session with ID:', this.sessionId);
+          this.logger.log('Configuring session with ID:', this.sessionId);
           
           // Create offer
           const offer = await this.peerConnection.createOffer();
@@ -832,15 +853,15 @@
             
             // Если сервер вернул новый ID сессии, используем его
             if (response.status === 404 && data.newSessionId) {
-              console.log('Voice AI SDK: Server provided new session ID:', data.newSessionId);
+              this.logger.log('Server provided new session ID:', data.newSessionId);
               this.sessionId = data.newSessionId;
               this._saveSession();
               
               // Add a delay before retrying to allow the server to fully register the session
-              console.log('Voice AI SDK: Waiting for session to be fully registered...');
+              this.logger.debug('Waiting for session to be fully registered...');
               return new Promise(resolve => {
                 setTimeout(async () => {
-                  console.log('Voice AI SDK: Retrying with new session ID');
+                  this.logger.debug('Retrying with new session ID');
                   resolve(await this._configureSession());
                 }, 1000); // 1 second delay
               });
@@ -848,16 +869,16 @@
             
             // Если сессия не найдена, пробуем создать новую
             if (response.status === 404 && errorMessage.includes('Session not found')) {
-              console.log('Voice AI SDK: Session not found, creating a new one');
+              this.logger.log('Session not found, creating a new one');
               this.sessionId = null;
               localStorage.removeItem('voice_ai_session');
               await this._initSession();
               
               // Add a delay before retrying to allow the server to fully register the session
-              console.log('Voice AI SDK: Waiting for session to be fully registered...');
+              this.logger.debug('Waiting for session to be fully registered...');
               return new Promise(resolve => {
                 setTimeout(async () => {
-                  console.log('Voice AI SDK: Retrying with new session ID');
+                  this.logger.debug('Retrying with new session ID');
                   resolve(await this._configureSession());
                 }, 1000); // 1 second delay
               });
@@ -877,7 +898,7 @@
           
           return true;
         } catch (error) {
-          console.error('Voice AI SDK: Session configuration failed', error);
+          this.logger.error('Session configuration failed', error);
           this._updateUI('error');
           throw error;
         }
@@ -888,7 +909,7 @@
        * @private
        */
       _onDataChannelOpen() {
-        console.log('Voice AI SDK: Data channel opened');
+        this.logger.log('Data channel opened');
         
         // Add a small delay before configuring the data channel to ensure connection stability
         setTimeout(() => {
@@ -906,24 +927,24 @@
        */
       _configureDataChannel() {
         if (!this.dataChannel) {
-          console.error('Voice AI SDK: Data channel not available, cannot configure');
+          this.logger.error('Data channel not available, cannot configure');
           this._updateUI('error');
           return;
         }
         
         if (this.dataChannel.readyState !== 'open') {
-          console.error('Voice AI SDK: Data channel not open, cannot configure. State:', this.dataChannel.readyState);
+          this.logger.error('Data channel not open, cannot configure. State:', this.dataChannel.readyState);
           this._updateUI('error');
           return;
         }
 
-        console.log('Voice AI SDK: Configuring data channel');
+        this.logger.log('Configuring data channel');
 
         // Send messages in sequence with proper timing
         const sendMessages = async () => {
           try {
             // 1. Send session update
-            console.log('Voice AI SDK: Sending session update');
+            this.logger.debug('Sending session update');
             const sessionUpdate = {
               type: 'session.update',
               session: {
@@ -958,7 +979,7 @@
             
             // Check if data channel is still open before sending
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              console.error('Voice AI SDK: Data channel closed while configuring');
+              this.logger.error('Data channel closed while configuring');
               this._updateUI('error');
               return;
             }
@@ -970,13 +991,13 @@
             
             // Check if data channel is still open before sending next message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              console.error('Voice AI SDK: Data channel closed while configuring');
+              this.logger.error('Data channel closed while configuring');
               this._updateUI('error');
               return;
             }
             
             // 2. Send initial message
-            console.log('Voice AI SDK: Sending initial message');
+            this.logger.debug('Sending initial message');
             const startPrompt = {
               type: 'conversation.item.create',
               item: {
@@ -996,20 +1017,20 @@
             
             // Check if data channel is still open before sending final message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              console.error('Voice AI SDK: Data channel closed while configuring');
+              this.logger.error('Data channel closed while configuring');
               this._updateUI('error');
               return;
             }
             
             // 3. Request response creation
-            console.log('Voice AI SDK: Requesting response creation');
+            this.logger.debug('Requesting response creation');
             const createResponse = {
               type: 'response.create'
             };
             
             this.dataChannel.send(JSON.stringify(createResponse));
           } catch (error) {
-            console.error('Voice AI SDK: Error sending messages:', error);
+            this.logger.error('Error sending messages:', error);
             this._updateUI('error');
             
             // Call onError callback
@@ -1031,7 +1052,9 @@
       _onDataChannelMessage(event) {
         try {
           const message = JSON.parse(event.data);
-          console.log('Voice AI SDK: Received message', message);
+          
+          // Use debug logger for detailed event messages
+          this.logger.debug('Received message', message);
           
           // Handle different message types
           switch (message.type) {
@@ -1067,7 +1090,7 @@
               
             case 'function_call':
               // Handle function call from AI agent
-              console.log('Voice AI SDK: Function call received', message.function_call);
+              this.logger.log('Function call received', message.function_call);
               
               // Check if function_call and its properties exist
               if (!message.function_call || !message.function_call.name) {
@@ -1271,7 +1294,7 @@
        * @private
        */
       _onDataChannelClose() {
-        console.log('Voice AI SDK: Data channel closed');
+        this.logger.log('Data channel closed');
         this.isListening = false;
         
         // Update UI to idle state
@@ -1293,7 +1316,7 @@
        * @param {Event} error - The error event
        */
       _onDataChannelError(error) {
-        console.error('Voice AI SDK: Data channel error', error);
+        this.logger.error('Data channel error', error);
         
         // Update UI to error state
         this._updateUI('error');
@@ -1316,7 +1339,7 @@
        */
       _onIceCandidate(event) {
         if (event.candidate) {
-          console.log('Voice AI SDK: New ICE candidate', event.candidate);
+          this.logger.debug('New ICE candidate', event.candidate);
         }
       }
   
@@ -1327,16 +1350,16 @@
       _onConnectionStateChange() {
         if (!this.peerConnection) return;
         
-        console.log('Voice AI SDK: Connection state changed to', this.peerConnection.connectionState);
+        this.logger.debug('Connection state changed to', this.peerConnection.connectionState);
         
         switch (this.peerConnection.connectionState) {
           case 'connected':
-            console.log('Voice AI SDK: WebRTC connection established');
+            this.logger.log('WebRTC connection established');
             // Don't update UI here, as it will be handled by the data channel open handler
             break;
             
           case 'disconnected':
-            console.log('Voice AI SDK: WebRTC connection disconnected, attempting to recover');
+            this.logger.log('WebRTC connection disconnected, attempting to recover');
             // Show error state but don't close the session yet, as it might recover
             this._updateUI('error');
             
@@ -1350,7 +1373,7 @@
               if (this.peerConnection && 
                   (this.peerConnection.connectionState === 'disconnected' || 
                    this.peerConnection.connectionState === 'failed')) {
-                console.log('Voice AI SDK: WebRTC connection failed to recover, cleaning up');
+                this.logger.log('WebRTC connection failed to recover, cleaning up');
                 this._cleanupWebRTC();
                 this.isActive = false;
                 this.isListening = false;
@@ -1364,7 +1387,7 @@
             break;
             
           case 'failed':
-            console.error('Voice AI SDK: WebRTC connection failed');
+            this.logger.error('WebRTC connection failed');
             this._updateUI('error');
             
             // Call onError callback
@@ -1384,7 +1407,7 @@
             break;
             
           case 'closed':
-            console.log('Voice AI SDK: WebRTC connection closed');
+            this.logger.log('WebRTC connection closed');
             this._updateUI('inactive');
             break;
         }
@@ -1395,34 +1418,60 @@
        * @private
        */
       _cleanupWebRTC() {
-        console.log('Voice AI SDK: Cleaning up WebRTC resources');
+        this.logger.log('Cleaning up WebRTC resources');
         
         // Close data channel
         if (this.dataChannel) {
-          this.dataChannel.close();
+          try {
+            this.dataChannel.close();
+          } catch (e) {
+            this.logger.error('Error closing data channel', e);
+          }
           this.dataChannel = null;
         }
         
         // Close peer connection
         if (this.peerConnection) {
-          this.peerConnection.close();
+          try {
+            // Remove all event listeners
+            this.peerConnection.onicecandidate = null;
+            this.peerConnection.onconnectionstatechange = null;
+            this.peerConnection.ontrack = null;
+            
+            // Close the connection
+            this.peerConnection.close();
+          } catch (e) {
+            this.logger.error('Error closing peer connection', e);
+          }
           this.peerConnection = null;
         }
         
         // Stop media stream
-        if (this.mediaStream) {
-          this.mediaStream.getTracks().forEach(track => {
-            track.stop();
-          });
-          this.mediaStream = null;
+        if (this.stream) {
+          try {
+            this.stream.getTracks().forEach(track => {
+              track.stop();
+            });
+          } catch (e) {
+            this.logger.error('Error stopping media stream', e);
+          }
+          this.stream = null;
+        }
+        
+        // Clean up audio element
+        if (this.audioElement) {
+          try {
+            this.audioElement.srcObject = null;
+            this.audioElement.remove();
+          } catch (e) {
+            this.logger.error('Error cleaning up audio element', e);
+          }
+          this.audioElement = null;
         }
         
         // Reset state
         this.isActive = false;
         this.isListening = false;
-        
-        // Update UI to idle state
-        this._updateUI('idle');
       }
   
       /**
@@ -1430,7 +1479,11 @@
        * @public
        */
       async startSession() {
-        if (this.isActive) return;
+        // Prevent multiple rapid calls
+        if (this.isActive || this._startSessionInProgress) return;
+        
+        // Set flag to prevent multiple calls
+        this._startSessionInProgress = true;
         
         try {
           // Show loading state immediately
@@ -1441,6 +1494,7 @@
           
           if (!webrtcInitialized) {
             this._updateUI('error');
+            this._startSessionInProgress = false;
             return;
           }
           
@@ -1459,7 +1513,7 @@
             this.config.onStart();
           }
         } catch (error) {
-          console.error('Voice AI SDK: Failed to start session', error);
+          this.logger.error('Failed to start session', error);
           
           // Clean up resources
           this._cleanupWebRTC();
@@ -1471,6 +1525,9 @@
           if (typeof this.config.onError === 'function') {
             this.config.onError(error);
           }
+        } finally {
+          // Reset the flag regardless of success or failure
+          this._startSessionInProgress = false;
         }
       }
   
@@ -1479,7 +1536,13 @@
        * @public
        */
       stopSession() {
-        console.log('Voice AI SDK: Stopping session');
+        this.logger.log('Stopping session');
+        
+        // If not active, nothing to do
+        if (!this.isActive && !this._startSessionInProgress) {
+          this.logger.debug('Session already stopped');
+          return;
+        }
         
         // Clear volume detection interval
         if (this.volumeInterval) {
@@ -1500,6 +1563,14 @@
           this.analyser = null;
         }
         
+        // Stop all audio tracks
+        if (this.stream) {
+          this.stream.getTracks().forEach(track => {
+            track.stop();
+          });
+          this.stream = null;
+        }
+        
         // Clean up WebRTC resources
         this._cleanupWebRTC();
         
@@ -1507,6 +1578,7 @@
         this.isActive = false;
         this.isListening = false;
         this.currentVolume = 0;
+        this._startSessionInProgress = false;
         
         // Update UI to idle state
         this._updateUI('idle');
@@ -1538,7 +1610,10 @@
        */
       async _initWebRTC() {
         try {
-          console.log('Voice AI SDK: Initializing WebRTC');
+          this.logger.log('Initializing WebRTC');
+          
+          // Clean up any existing WebRTC resources first
+          this._cleanupWebRTC();
           
           // Create a new RTCPeerConnection
           this.peerConnection = new RTCPeerConnection({
@@ -1552,7 +1627,21 @@
           this.peerConnection.onconnectionstatechange = this._onConnectionStateChange.bind(this);
           
           // Get user media
-          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (mediaError) {
+            this.logger.error('Error accessing microphone', mediaError);
+            
+            // Check if it's a permission error
+            if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
+              this.logger.error('Microphone permission denied');
+              alert('Voice AI requires microphone access. Please allow microphone access and try again.');
+            } else {
+              alert('Error accessing microphone. Please check your device settings and try again.');
+            }
+            
+            return false;
+          }
           
           // Set up audio visualization
           this._setupAudioVisualization(this.stream);
@@ -1567,7 +1656,7 @@
           this.audioElement.autoplay = true;
           
           this.peerConnection.ontrack = (event) => {
-            console.log('Voice AI SDK: Received audio track');
+            this.logger.debug('Received audio track');
             this.audioElement.srcObject = event.streams[0];
           };
           
@@ -1582,11 +1671,11 @@
           const offer = await this.peerConnection.createOffer();
           await this.peerConnection.setLocalDescription(offer);
           
-          console.log('Voice AI SDK: Created offer');
+          this.logger.debug('Created offer');
           
           return true;
         } catch (error) {
-          console.error('Voice AI SDK: Error initializing WebRTC', error);
+          this.logger.error('Error initializing WebRTC', error);
           this._updateUI('error');
           return false;
         }

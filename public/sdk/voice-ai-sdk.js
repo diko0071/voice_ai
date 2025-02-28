@@ -958,31 +958,7 @@
               return;
             }
             
-            // 2. Send initial message
-            this.logger.debug('Sending initial message');
-            const startPrompt = {
-              type: 'conversation.item.create',
-              item: {
-                type: 'message',
-                role: 'user',
-                content: [{
-                  type: 'input_text',
-                  text: 'Begin the conversation by introducing yourself as an Improvado representative'
-                }]
-              }
-            };
-            
-            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
-            await this.dataChannel.send(JSON.stringify(startPrompt));
-            
-            // Check if data channel is still open before sending final message
-            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              this.logger.error('Data channel closed while configuring');
-              this._updateUI('error');
-              return;
-            }
-            
-            // 3. Request response creation
+            // 2. Request response creation
             this.logger.debug('Requesting response creation');
             const createResponse = {
               type: 'response.create'
@@ -990,6 +966,15 @@
             
             // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
             await this.dataChannel.send(JSON.stringify(createResponse));
+
+            // Check if data channel is still open before sending final message
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+              this.logger.error('Data channel closed while configuring');
+              this._updateUI('error');
+              return;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
           } catch (error) {
             this.logger.error('Error sending messages:', error);
             this._updateUI('error');

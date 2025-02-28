@@ -152,4 +152,5 @@ export function getSessionCount(): number {
 }
 
 // Clean up expired sessions every 5 minutes
-setInterval(cleanupExpiredSessions, 5 * 60 * 1000); 
+// Use .unref() to prevent the timer from keeping the Node.js process alive during tests
+setInterval(cleanupExpiredSessions, 5 * 60 * 1000).unref(); 

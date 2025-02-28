@@ -191,7 +191,7 @@
         
         // Create message element
         const messageElement = document.createElement('div');
-        messageElement.textContent = message || 'Would you like to schedule a meeting with our team?';
+        messageElement.textContent = message || 'Please book a meeting with our team';
         messageElement.style.fontSize = '14px';
         messageElement.style.lineHeight = '1.5';
         messageElement.style.color = '#333333';
@@ -926,13 +926,7 @@
                     description: 'Show a popup with a button to book a meeting. Use when: (1) User wants to learn more about Improvado, (2) User wants to schedule a demo/meeting, (3) User asks about pricing/implementation details, (4) Conversation requires human representative, (5) User explicitly asks to book a meeting. Provide personalized message about benefits. When using this tool, tell the user directly: "I\'ve opened a booking popup for you. Please click the button to schedule a meeting." After using, end conversation with: "I\'ll be here when you\'re ready to continue. Just click the microphone button again."',
                     parameters: {
                       type: 'object',
-                      properties: {
-                        message: {
-                          type: 'string',
-                          description: 'Message to display in the popup'
-                        }
-                      },
-                      required: ['message']
+                      properties: {}
                     }
                   }
                 ],

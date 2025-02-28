@@ -16,30 +16,50 @@ interface TextLogData {
 // Create logs directory if it doesn't exist
 const ensureLogDirectory = () => {
   const logsDir = path.join(process.cwd(), 'logs');
-  const textLogsDir = path.join(logsDir, 'text-logs');
   
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir);
   }
   
-  if (!fs.existsSync(textLogsDir)) {
-    fs.mkdirSync(textLogsDir);
-  }
-  
-  return textLogsDir;
+  return logsDir;
 };
 
-// Ensure date-based directory exists
-const ensureDateDirectory = () => {
-  const textLogsDir = ensureLogDirectory();
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-  const dateDir = path.join(textLogsDir, today);
-  
-  if (!fs.existsSync(dateDir)) {
-    fs.mkdirSync(dateDir);
+// Find existing log file by session ID
+const findExistingLogFile = (logsDir: string, sessionId: string): { filePath: string, data: TextLogData[] } | null => {
+  try {
+    // Check if directory exists
+    if (!fs.existsSync(logsDir)) {
+      return null;
+    }
+    
+    // Read all files in the directory
+    const files = fs.readdirSync(logsDir);
+    
+    // Look for files that end with _sessionId.json
+    const sessionFilePattern = new RegExp(`_${sessionId}\\.json$`);
+    const matchingFile = files.find(file => sessionFilePattern.test(file));
+    
+    if (matchingFile) {
+      const filePath = path.join(logsDir, matchingFile);
+      console.log(`[voice/text-log] Found existing log file for session: ${filePath}`);
+      
+      // Read the file content
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      let data = JSON.parse(fileContent);
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        data = [data];
+      }
+      
+      return { filePath, data };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`[voice/text-log] Error finding existing log file:`, error);
+    return null;
   }
-  
-  return dateDir;
 };
 
 export async function POST(request: Request) {
@@ -151,33 +171,34 @@ export async function POST(request: Request) {
     
     console.log('[voice/text-log] Created log data object');
     
-    // Ensure date-based directory exists
-    const dateDir = ensureDateDirectory();
-    console.log(`[voice/text-log] Ensured date directory exists: ${dateDir}`);
+    // Ensure logs directory exists
+    const logsDir = ensureLogDirectory();
+    console.log(`[voice/text-log] Ensured logs directory exists: ${logsDir}`);
     
-    // Create session-based filename
-    const filePath = path.join(dateDir, `${sessionId}.json`);
-    console.log(`[voice/text-log] Log file path: ${filePath}`);
-    
-    // Check if file exists and append to it, or create new file
+    // Try to find existing log file for this session
     let existingData: TextLogData[] = [];
-    if (fs.existsSync(filePath)) {
-      console.log(`[voice/text-log] Log file exists, reading existing data`);
-      try {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        existingData = JSON.parse(fileContent);
-        console.log(`[voice/text-log] Successfully read existing data, entries: ${existingData.length}`);
-        
-        if (!Array.isArray(existingData)) {
-          console.log(`[voice/text-log] Existing data is not an array, converting to array`);
-          existingData = [existingData]; // Convert to array if it's a single object
-        }
-      } catch (error) {
-        console.error(`[voice/text-log] Error reading existing log file: ${filePath}`, error);
-        existingData = [];
-      }
+    let filePath: string;
+    
+    const existingFile = findExistingLogFile(logsDir, sessionId);
+    
+    if (existingFile) {
+      // Use existing file
+      existingData = existingFile.data;
+      filePath = existingFile.filePath;
     } else {
-      console.log(`[voice/text-log] Log file does not exist, creating new file`);
+      // No existing file found, create a new one
+      console.log(`[voice/text-log] No existing log file found, creating new file`);
+      
+      // Use current time for the filename
+      const now = new Date();
+      const dateTimeStr = now.toISOString()
+        .replace('T', '_')
+        .replace(/:/g, '-')
+        .split('.')[0]; // Remove milliseconds
+      
+      // Create filename with date_time_sessionId format
+      const fileName = `${dateTimeStr}_${sessionId}.json`;
+      filePath = path.join(logsDir, fileName);
     }
     
     // Add new log entry

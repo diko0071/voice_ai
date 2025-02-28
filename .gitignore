@@ -54,3 +54,6 @@ voice-ai-debug.log
 
 # Temporary files
 /temp
+
+# Logs
+/logs

@@ -317,36 +317,21 @@
         try {
           console.log('Voice AI SDK: Validating session', sessionId);
           
-          // Try up to 3 times with a delay between attempts
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${sessionId}`, {
-                method: 'GET'
-              });
-              
-              if (response.ok) {
-                this.sessionValidationInProgress = false;
-                console.log('Voice AI SDK: Session validated successfully on attempt', attempt);
-                return true;
-              }
-              
-              // If this is not the last attempt, wait before retrying
-              if (attempt < 3) {
-                console.log(`Voice AI SDK: Session validation failed on attempt ${attempt}, retrying in 1 second...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
-            } catch (fetchError) {
-              console.error('Voice AI SDK: Error during session validation attempt', fetchError);
-              
-              // If this is not the last attempt, wait before retrying
-              if (attempt < 3) {
-                console.log(`Voice AI SDK: Session validation error on attempt ${attempt}, retrying in 1 second...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
+          try {
+            const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${sessionId}`, {
+              method: 'GET'
+            });
+            
+            if (response.ok) {
+              this.sessionValidationInProgress = false;
+              console.log('Voice AI SDK: Session validated successfully');
+              return true;
             }
+          } catch (fetchError) {
+            console.error('Voice AI SDK: Error during session validation', fetchError);
           }
           
-          console.log('Voice AI SDK: Session validation failed after 3 attempts');
+          console.log('Voice AI SDK: Session validation failed');
           this.sessionValidationInProgress = false;
           return false;
         } catch (error) {
@@ -445,49 +430,34 @@
             // Create a new session
             this.logger.log('Creating new session');
             
-            // Try up to 3 times with a delay between attempts
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                const response = await fetch(`${this.config.serverUrl}/api/v1/sessions`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    clientId: this.clientId
-                  })
-                });
+            try {
+              const response = await fetch(`${this.config.serverUrl}/api/v1/sessions`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  clientId: this.clientId
+                })
+              });
+              
+              const data = await response.json();
+              
+              if (response.ok) {
+                this.sessionId = data.sessionId;
+                this.logger.log('New session created', this.sessionId);
+                this._saveSession();
                 
-                const data = await response.json();
+                // Add a small delay to ensure the session is fully registered on the server
+                this.logger.debug('Waiting for session to be fully registered...');
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
-                if (response.ok) {
-                  this.sessionId = data.sessionId;
-                  this.logger.log('New session created', this.sessionId);
-                  this._saveSession();
-                  
-                  // Add a small delay to ensure the session is fully registered on the server
-                  this.logger.debug('Waiting for session to be fully registered...');
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  
-                  return;
-                }
-                
-                // If this is not the last attempt, wait before retrying
-                if (attempt < 3) {
-                  this.logger.debug(`Session creation failed on attempt ${attempt}, retrying in 1 second...`);
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                } else {
-                  throw new Error(data.error || 'Failed to create session after 3 attempts');
-                }
-              } catch (fetchError) {
-                // If this is not the last attempt, wait before retrying
-                if (attempt < 3) {
-                  this.logger.debug(`Session creation error on attempt ${attempt}, retrying in 1 second...`);
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                } else {
-                  throw fetchError;
-                }
+                return;
+              } else {
+                throw new Error(data.error || 'Failed to create session');
               }
+            } catch (fetchError) {
+              throw fetchError;
             }
           } else {
             this.logger.log('Using existing session', this.sessionId);

@@ -41,6 +41,10 @@
         this._startSessionInProgress = false;
         this.debug = this.config.debug || false; // Store debug mode setting
         
+        // Для дедупликации логов
+        this.lastLoggedTexts = {};
+        this.logDeduplicationWindow = 2000; // 2 секунды
+        
         // Add logger methods that respect debug mode
         this.logger = {
           log: (message, ...args) => {
@@ -118,6 +122,10 @@
        */
       async _init() {
         try {
+          // Generate a unique session ID if not provided
+          this.sessionId = this.config.sessionId || `sdk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          this.logger.debug('Session ID:', this.sessionId);
+          
           // Load session from localStorage
           await this._loadSession();
           
@@ -909,12 +917,14 @@
         }
 
         this.logger.log('Configuring data channel');
+        console.log('Voice AI SDK: Configuring data channel');
 
         // Send messages in sequence with proper timing
         const sendMessages = async () => {
           try {
             // 1. Send session update
             this.logger.debug('Sending session update');
+            console.log('Voice AI SDK: Sending session update');
             const sessionUpdate = {
               type: 'session.update',
               session: {
@@ -937,6 +947,9 @@
                   silence_duration_ms: 200,
                   create_response: true
                 },
+                input_audio_transcription: {
+                  model: "whisper-1"
+                },
                 instructions: this.instructions
               }
             };
@@ -950,6 +963,35 @@
             
             // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
             await this.dataChannel.send(JSON.stringify(sessionUpdate));
+            console.log('Voice AI SDK: Session update sent');
+            
+            // Check if data channel is still open before sending next message
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+              this.logger.error('Data channel closed while configuring');
+              this._updateUI('error');
+              return;
+            }
+            
+            // Send initial user message
+            console.log('Voice AI SDK: Sending initial user message');
+            const initialMessage = {
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: 'user',
+                content: [{
+                  type: 'input_text',
+                  text: 'Begin the conversation'
+                }]
+              }
+            };
+            
+            // Log user text to our API
+            this._logTextToAPI('user', 'Begin the conversation');
+            
+            // Send the message
+            await this.dataChannel.send(JSON.stringify(initialMessage));
+            console.log('Voice AI SDK: Initial user message sent');
             
             // Check if data channel is still open before sending next message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
@@ -960,12 +1002,14 @@
             
             // 2. Request response creation
             this.logger.debug('Requesting response creation');
+            console.log('Voice AI SDK: Requesting response creation');
             const createResponse = {
               type: 'response.create'
             };
             
             // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
             await this.dataChannel.send(JSON.stringify(createResponse));
+            console.log('Voice AI SDK: Response creation request sent');
 
             // Check if data channel is still open before sending final message
             if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
@@ -975,8 +1019,10 @@
             }
 
             await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log('Voice AI SDK: Data channel configuration completed');
           } catch (error) {
             this.logger.error('Error sending messages:', error);
+            console.error('Voice AI SDK: Error configuring data channel:', error);
             this._updateUI('error');
             
             // Call onError callback
@@ -1014,24 +1060,72 @@
               this._updateUI('responding');
               break;
               
-            case 'response':
-              // Add message to history
-              this.messages.push({
-                role: 'assistant',
-                content: message.content
-              });
+            case 'conversation.item.input_audio_transcription.completed':
+              // This is a transcription of user audio input
+              if (message.transcript) {
+                // Проверяем, является ли transcript строкой или объектом с полем text
+                const transcriptionText = typeof message.transcript === 'string' 
+                  ? message.transcript 
+                  : (message.transcript.text || '');
+                
+                if (transcriptionText) {
+                  // Логируем транскрипции пользователя
+                  // Это единственный источник транскрипций пользователя, поэтому сохраняем его
+                  this._logTextToAPI('user', transcriptionText, {
+                    isTranscription: true,
+                    source: 'audio_transcription',
+                    messageType: message.type,
+                    itemId: message.item_id
+                  });
+                }
+              }
+              break;
               
-              // Call onMessage callback
-              if (typeof this.config.onMessage === 'function') {
-                this.config.onMessage({
-                  role: 'assistant',
-                  content: message.content
+            case 'response.done':
+              // Response done contains the final response with all outputs
+              if (message.response && message.response.output) {
+                // Process each output item
+                message.response.output.forEach((item, index) => {
+                  if (item.content) {
+                    let textContent = '';
+                    let isAudioTranscript = false;
+                    let itemRole = item.role || 'assistant';
+                    
+                    // Если content - это массив
+                    if (Array.isArray(item.content)) {
+                      // Проверяем, есть ли аудио-контент
+                      const audioContent = item.content.find(content => content.type === 'audio');
+                      if (audioContent && audioContent.transcript) {
+                        textContent = audioContent.transcript;
+                        isAudioTranscript = true;
+                      } else {
+                        // Извлекаем текст из всех элементов контента
+                        textContent = item.content
+                          .filter(content => content.type === 'text' || content.type === 'audio')
+                          .map(content => content.text || content.transcript)
+                          .filter(Boolean)
+                          .join(' ');
+                      }
+                    } else if (typeof item.content === 'string') {
+                      // Если content - это строка
+                      textContent = item.content;
+                    }
+                    
+                    if (textContent) {
+                      // Логируем только финальные сообщения из response.done
+                      this._logTextToAPI(itemRole, textContent, {
+                        isTranscription: isAudioTranscript,
+                        source: isAudioTranscript ? 'audio_transcription' : 'response_output',
+                        messageType: message.type,
+                        itemId: item.id,
+                        responseId: message.response.id,
+                        outputIndex: index,
+                        isFinalResponse: true
+                      });
+                    }
+                  }
                 });
               }
-              
-              // Keep responding state until user starts speaking or agent speaks again
-              // This prevents showing the volume visualization prematurely
-              this._updateUI('responding');
               break;
               
             case 'function_call':
@@ -1202,7 +1296,7 @@
               this._updateUI('error');
               break;
               
-            // Handle specific OpenAI WebSocket message types
+            // Handle specific OpenAI WebSocket message types for UI updates
             case 'input_audio_buffer.speech_started':
               // User started speaking - show volume visualization
               this._updateUI('volume', this.currentVolume || 0.1);
@@ -1210,7 +1304,6 @@
               
             case 'input_audio_buffer.speech_ended':
               // User stopped speaking - go back to responding state
-              // This keeps the pulsing circle instead of showing volume bars
               this._updateUI('responding');
               break;
               
@@ -1221,13 +1314,12 @@
               
             case 'output_audio_buffer.ended':
               // Agent stopped speaking - keep responding state
-              // This keeps the pulsing circle instead of showing volume bars
               this._updateUI('responding');
               break;
               
+            // Все остальные типы сообщений игнорируем для логирования
             default:
-              // For any other message, keep the current UI state
-              // Don't automatically switch to volume visualization
+              // Не логируем никакие другие типы сообщений
               break;
           }
         } catch (error) {
@@ -1434,6 +1526,12 @@
         try {
           // Show loading state immediately
           this._updateUI('loading');
+          
+          // Generate a unique session ID if not already set
+          if (!this.sessionId) {
+            this.sessionId = `sdk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            this.logger.debug('Generated new session ID:', this.sessionId);
+          }
           
           // Initialize WebRTC
           const webrtcInitialized = await this._initWebRTC();
@@ -1751,6 +1849,241 @@
         if (this.volumeInterval) {
           clearInterval(this.volumeInterval);
           this.volumeInterval = null;
+        }
+      }
+  
+      /**
+       * Log text to our API
+       * @private
+       * @param {string} type - The type of text (user or assistant)
+       * @param {string|object} text - The text to log or object containing text
+       * @param {Object} options - Additional options for logging
+       * @param {boolean} options.isTranscription - Whether this is an audio transcription
+       * @param {string} options.source - Source of the text (e.g., 'audio_transcription')
+       */
+      _logTextToAPI(type, text, options = {}) {
+        try {
+          // Validate session ID
+          if (!this.sessionId) {
+            console.error('Voice AI SDK: Cannot log text: No session ID available');
+            return;
+          }
+          
+          // Normalize type
+          const normalizedType = (type === 'user' || type === 'assistant') ? type : 'assistant';
+          
+          // Handle different text formats
+          let textToLog = '';
+          
+          if (typeof text === 'string') {
+            textToLog = text;
+          } else if (text && typeof text === 'object') {
+            // Try to extract text from object
+            if (text.text) {
+              textToLog = text.text;
+            } else if (text.transcript) {
+              textToLog = text.transcript;
+              // Если это объект с транскриптом, то это, вероятно, транскрипция аудио
+              options.isTranscription = true;
+              options.source = 'audio_transcription';
+            } else if (text.content) {
+              textToLog = typeof text.content === 'string' ? text.content : JSON.stringify(text.content);
+            } else {
+              // Try to convert the entire object to string
+              try {
+                textToLog = JSON.stringify(text);
+              } catch (e) {
+                console.error('Voice AI SDK: Cannot convert object to string for logging', e);
+                return;
+              }
+            }
+          } else if (text === null || text === undefined) {
+            console.error('Voice AI SDK: Cannot log null or undefined text');
+            return;
+          } else {
+            // Try to convert to string
+            textToLog = String(text);
+          }
+          
+          // Trim text and check if it's empty
+          const trimmedText = textToLog.trim();
+          if (!trimmedText) {
+            return;
+          }
+          
+          // Проверяем, является ли это транскрипцией аудио
+          const isTranscription = options.isTranscription || 
+            (trimmedText.includes('\n') && normalizedType === 'user'); // Часто транскрипции заканчиваются переносом строки
+  
+          // Prepare request payload
+          const payload = {
+            clientId: this.config.clientId,
+            sessionId: this.sessionId,
+            type: normalizedType,
+            text: trimmedText
+          };
+          
+          // Add additional fields if this is a transcription
+          if (isTranscription) {
+            payload.isTranscription = true;
+          }
+          
+          if (options.source) {
+            payload.source = options.source;
+          }
+          
+          // Create the request
+          fetch(`${this.config.serverUrl}/api/v1/voice/text-log`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Referer': window.location.href // Add referer for validation
+            },
+            body: JSON.stringify(payload),
+          })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(data => {
+                console.error('Voice AI SDK: Text logging failed:', data);
+                throw new Error(`Failed to log text: ${data.error || response.status}`);
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            this.logger.debug('Text logged successfully to API:', data);
+          })
+          .catch(error => {
+            this.logger.error('Error logging text to API:', error);
+            console.error('Voice AI SDK: Error logging text to API:', error);
+            
+            // Try to log the error details for debugging
+            console.error('Voice AI SDK: Failed text log details:', {
+              type: normalizedType,
+              sessionId: this.sessionId,
+              textLength: trimmedText.length,
+              textPreview: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
+              isTranscription
+            });
+          });
+        } catch (error) {
+          this.logger.error('Error preparing text log request:', error);
+          console.error('Voice AI SDK: Error preparing text log request:', error);
+          
+          // Try to log the error details for debugging
+          try {
+            console.error('Voice AI SDK: Text log error details:', {
+              type: normalizedType,
+              sessionId: this.sessionId,
+              textType: typeof text,
+              error: error.message
+            });
+          } catch (e) {
+            console.error('Voice AI SDK: Failed to log error details');
+          }
+        }
+      }
+  
+      /**
+       * Send user text to the assistant
+       * @private
+       * @param {string} text - The text to send
+       */
+      _sendUserText(text) {
+        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+          this.logger.error('Cannot send text: Data channel not open');
+          return;
+        }
+        
+        try {
+          // Create conversation item
+          const message = {
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'user',
+              content: [{
+                type: 'input_text',
+                text: text
+              }]
+            }
+          };
+          
+          // Send the message
+          this.dataChannel.send(JSON.stringify(message));
+          
+          // Log user text to our API
+          this._logTextToAPI('user', text);
+          
+          // Add to message history
+          this.messages.push({
+            role: 'user',
+            content: text
+          });
+          
+          // Call onMessage callback
+          if (typeof this.config.onMessage === 'function') {
+            this.config.onMessage({
+              role: 'user',
+              content: text
+            });
+          }
+          
+          // Create response
+          const createResponse = {
+            type: 'response.create'
+          };
+          
+          // Send the response creation request
+          this.dataChannel.send(JSON.stringify(createResponse));
+        } catch (error) {
+          this.logger.error('Error sending user text:', error);
+        }
+      }
+
+      /**
+       * Initialize the SDK
+       * @param {Object} config - Configuration options
+       * @returns {Promise<VoiceAI>} - The VoiceAI instance
+       */
+      async _initialize(config) {
+        try {
+          this.logger.log('Initializing Voice AI SDK');
+          
+          // Generate a unique session ID if not provided
+          this.sessionId = config.sessionId || `sdk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          this.logger.debug('Session ID:', this.sessionId);
+          
+          // Create UI elements
+          this._createUI();
+          
+          // Set initial state
+          this._updateUI('idle');
+          
+          // Initialize WebRTC
+          const webrtcInitialized = await this._initWebRTC();
+          
+          if (!webrtcInitialized) {
+            this.logger.error('Failed to initialize WebRTC');
+            this._updateUI('error');
+            return false;
+          }
+          
+          // Configure session
+          const sessionConfigured = await this._configureSession();
+          
+          if (!sessionConfigured) {
+            this.logger.error('Failed to configure session');
+            this._updateUI('error');
+            return false;
+          }
+          
+          this.logger.log('Voice AI SDK initialized successfully');
+          return true;
+        } catch (error) {
+          this.logger.error('Error initializing Voice AI SDK', error);
+          this._updateUI('error');
+          return false;
         }
       }
     }

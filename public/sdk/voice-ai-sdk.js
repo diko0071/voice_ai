@@ -35,6 +35,8 @@
         this.ui = null;
         this.mode = 'idle';
         this.sessionValidationInProgress = false;
+        this.meetingUrl = this.config.meetingUrl;
+        this.toolHandlers = {};
         
         // Validate required configuration
         let hasErrors = false;
@@ -50,12 +52,28 @@
           hasErrors = true;
         }
         
+        if (!this.meetingUrl) {
+          console.error('Voice AI SDK: Meeting URL is required. Please provide a valid meetingUrl in the configuration.');
+          console.error('Example: meetingUrl: "https://calendly.com/your-company/meeting"');
+          hasErrors = true;
+        }
+        
         // Check if serverUrl is a valid URL
         if (this.config.serverUrl) {
           try {
             new URL(this.config.serverUrl);
           } catch (e) {
             console.error(`Voice AI SDK: Invalid Server URL "${this.config.serverUrl}". Please provide a valid URL.`);
+            hasErrors = true;
+          }
+        }
+        
+        // Check if meetingUrl is a valid URL
+        if (this.meetingUrl) {
+          try {
+            new URL(this.meetingUrl);
+          } catch (e) {
+            console.error(`Voice AI SDK: Invalid Meeting URL "${this.meetingUrl}". Please provide a valid URL.`);
             hasErrors = true;
           }
         }
@@ -94,18 +112,136 @@
           // Register event listeners
           this._registerEventListeners();
           
+          // Register tool handlers
+          this._registerToolHandlers();
+          
           // Call onReady callback
           if (typeof this.config.onReady === 'function') {
             this.config.onReady();
           }
         } catch (error) {
-          console.error('Voice AI SDK: Initialization failed', error);
+          console.error('Voice AI SDK: Initialization error', error);
           
           // Call onError callback
           if (typeof this.config.onError === 'function') {
             this.config.onError(error);
           }
         }
+      }
+  
+      /**
+       * Register tool handlers for AI agent function calls
+       * @private
+       */
+      _registerToolHandlers() {
+        // Register the show_booking_popup tool
+        this.toolHandlers['show_booking_popup'] = (args) => {
+          return this._showBookingPopup(args.message);
+        };
+        
+        console.log('Voice AI SDK: Registered tool handlers', Object.keys(this.toolHandlers));
+      }
+      
+      /**
+       * Show booking popup with a message and a button to book a meeting
+       * @private
+       * @param {string} message - The message to display in the popup
+       * @returns {Object} - Result of the function call
+       */
+      _showBookingPopup(message) {
+        console.log('Voice AI SDK: Showing booking popup', message);
+        
+        // Create popup container
+        const popupContainer = document.createElement('div');
+        popupContainer.className = 'voice-ai-booking-popup';
+        popupContainer.style.position = 'fixed';
+        popupContainer.style.bottom = '100px';
+        popupContainer.style.right = '20px';
+        popupContainer.style.width = '300px';
+        popupContainer.style.padding = '20px';
+        popupContainer.style.backgroundColor = '#ffffff';
+        popupContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        popupContainer.style.borderRadius = '8px';
+        popupContainer.style.zIndex = '10000';
+        popupContainer.style.fontFamily = 'Arial, sans-serif';
+        popupContainer.style.display = 'flex';
+        popupContainer.style.flexDirection = 'column';
+        popupContainer.style.gap = '15px';
+        
+        // Create message element
+        const messageElement = document.createElement('div');
+        messageElement.textContent = message || 'Would you like to schedule a meeting with our team?';
+        messageElement.style.fontSize = '14px';
+        messageElement.style.lineHeight = '1.5';
+        messageElement.style.color = '#333333';
+        
+        // Create button
+        const bookButton = document.createElement('a');
+        bookButton.href = this.meetingUrl;
+        bookButton.target = '_blank';
+        bookButton.textContent = 'Book a Meeting';
+        bookButton.style.display = 'inline-block';
+        bookButton.style.padding = '10px 16px';
+        bookButton.style.backgroundColor = '#4a90e2';
+        bookButton.style.color = '#ffffff';
+        bookButton.style.textDecoration = 'none';
+        bookButton.style.borderRadius = '4px';
+        bookButton.style.fontWeight = 'bold';
+        bookButton.style.textAlign = 'center';
+        bookButton.style.cursor = 'pointer';
+        bookButton.style.transition = 'background-color 0.2s';
+        
+        // Hover effect
+        bookButton.onmouseover = () => {
+          bookButton.style.backgroundColor = '#3a80d2';
+        };
+        bookButton.onmouseout = () => {
+          bookButton.style.backgroundColor = '#4a90e2';
+        };
+        
+        // Create close button
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '×';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '10px';
+        closeButton.style.right = '10px';
+        closeButton.style.background = 'none';
+        closeButton.style.border = 'none';
+        closeButton.style.fontSize = '20px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.color = '#999999';
+        closeButton.style.padding = '0';
+        closeButton.style.lineHeight = '1';
+        
+        // Close button event
+        closeButton.onclick = () => {
+          document.body.removeChild(popupContainer);
+        };
+        
+        // Add elements to popup
+        popupContainer.appendChild(closeButton);
+        popupContainer.appendChild(messageElement);
+        popupContainer.appendChild(bookButton);
+        
+        // Add popup to body
+        document.body.appendChild(popupContainer);
+        
+        // Auto-close after 30 seconds
+        setTimeout(() => {
+          if (document.body.contains(popupContainer)) {
+            document.body.removeChild(popupContainer);
+          }
+        }, 30000);
+        
+        // Stop the session after a short delay to allow the AI to finish speaking
+        setTimeout(() => {
+          if (this.isActive) {
+            console.log('Voice AI SDK: Auto-stopping session after showing booking popup');
+            this.stopSession();
+          }
+        }, 10000);
+        
+        return { success: true, message: 'Booking popup displayed' };
       }
   
       /**
@@ -159,12 +295,39 @@
         
         try {
           console.log('Voice AI SDK: Validating session', sessionId);
-          const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${sessionId}`, {
-            method: 'GET'
-          });
           
+          // Try up to 3 times with a delay between attempts
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const response = await fetch(`${this.config.serverUrl}/api/v1/sessions?sessionId=${sessionId}`, {
+                method: 'GET'
+              });
+              
+              if (response.ok) {
+                this.sessionValidationInProgress = false;
+                console.log('Voice AI SDK: Session validated successfully on attempt', attempt);
+                return true;
+              }
+              
+              // If this is not the last attempt, wait before retrying
+              if (attempt < 3) {
+                console.log(`Voice AI SDK: Session validation failed on attempt ${attempt}, retrying in 1 second...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            } catch (fetchError) {
+              console.error('Voice AI SDK: Error during session validation attempt', fetchError);
+              
+              // If this is not the last attempt, wait before retrying
+              if (attempt < 3) {
+                console.log(`Voice AI SDK: Session validation error on attempt ${attempt}, retrying in 1 second...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+          }
+          
+          console.log('Voice AI SDK: Session validation failed after 3 attempts');
           this.sessionValidationInProgress = false;
-          return response.ok;
+          return false;
         } catch (error) {
           console.error('Voice AI SDK: Session validation failed', error);
           this.sessionValidationInProgress = false;
@@ -260,25 +423,51 @@
           if (!this.sessionId) {
             // Create a new session
             console.log('Voice AI SDK: Creating new session');
-            const response = await fetch(`${this.config.serverUrl}/api/v1/sessions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                clientId: this.clientId
-              })
-            });
             
-            const data = await response.json();
-            
-            if (!response.ok) {
-              throw new Error(data.error || 'Failed to create session');
+            // Try up to 3 times with a delay between attempts
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const response = await fetch(`${this.config.serverUrl}/api/v1/sessions`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    clientId: this.clientId
+                  })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                  this.sessionId = data.sessionId;
+                  console.log('Voice AI SDK: New session created', this.sessionId);
+                  this._saveSession();
+                  
+                  // Add a small delay to ensure the session is fully registered on the server
+                  console.log('Voice AI SDK: Waiting for session to be fully registered...');
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  return;
+                }
+                
+                // If this is not the last attempt, wait before retrying
+                if (attempt < 3) {
+                  console.log(`Voice AI SDK: Session creation failed on attempt ${attempt}, retrying in 1 second...`);
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                  throw new Error(data.error || 'Failed to create session after 3 attempts');
+                }
+              } catch (fetchError) {
+                // If this is not the last attempt, wait before retrying
+                if (attempt < 3) {
+                  console.log(`Voice AI SDK: Session creation error on attempt ${attempt}, retrying in 1 second...`);
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                  throw fetchError;
+                }
+              }
             }
-            
-            this.sessionId = data.sessionId;
-            console.log('Voice AI SDK: New session created', this.sessionId);
-            this._saveSession();
           } else {
             console.log('Voice AI SDK: Using existing session', this.sessionId);
           }
@@ -497,10 +686,35 @@
             case 'error':
               // Show error state
               const errorAnimation = document.createElement('div');
-              errorAnimation.className = 'voice-ai-idle-animation';
+              errorAnimation.className = 'voice-ai-error-animation';
               errorAnimation.style.backgroundColor = '#ff3b30';
+              
+              // Add pulsing effect for error state
+              const pulse = document.createElement('div');
+              pulse.className = 'voice-ai-error-pulse';
+              errorAnimation.appendChild(pulse);
+              
               buttonContainer.appendChild(errorAnimation);
               if (statusText) statusText.textContent = 'Error';
+              
+              // Auto-recover after 5 seconds
+              setTimeout(() => {
+                if (this.uiMode === 'error') {
+                  this._updateUI('idle');
+                  
+                  // Try to restart the session if it was active
+                  if (this.isActive) {
+                    this._cleanupWebRTC();
+                    this.isActive = false;
+                    this.isListening = false;
+                    
+                    // Wait a bit before trying to restart
+                    setTimeout(() => {
+                      this.startSession();
+                    }, 1000);
+                  }
+                }
+              }, 5000);
               break;
             
             case 'volume':
@@ -621,8 +835,15 @@
               console.log('Voice AI SDK: Server provided new session ID:', data.newSessionId);
               this.sessionId = data.newSessionId;
               this._saveSession();
-              // Пробуем снова с новой сессией
-              return this._configureSession();
+              
+              // Add a delay before retrying to allow the server to fully register the session
+              console.log('Voice AI SDK: Waiting for session to be fully registered...');
+              return new Promise(resolve => {
+                setTimeout(async () => {
+                  console.log('Voice AI SDK: Retrying with new session ID');
+                  resolve(await this._configureSession());
+                }, 1000); // 1 second delay
+              });
             }
             
             // Если сессия не найдена, пробуем создать новую
@@ -631,8 +852,15 @@
               this.sessionId = null;
               localStorage.removeItem('voice_ai_session');
               await this._initSession();
-              // Пробуем снова с новой сессией
-              return this._configureSession();
+              
+              // Add a delay before retrying to allow the server to fully register the session
+              console.log('Voice AI SDK: Waiting for session to be fully registered...');
+              return new Promise(resolve => {
+                setTimeout(async () => {
+                  console.log('Voice AI SDK: Retrying with new session ID');
+                  resolve(await this._configureSession());
+                }, 1000); // 1 second delay
+              });
             }
             
             throw new Error(errorMessage);
@@ -677,8 +905,15 @@
        * @private
        */
       _configureDataChannel() {
-        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-          console.log('Voice AI SDK: Data channel not open, cannot configure');
+        if (!this.dataChannel) {
+          console.error('Voice AI SDK: Data channel not available, cannot configure');
+          this._updateUI('error');
+          return;
+        }
+        
+        if (this.dataChannel.readyState !== 'open') {
+          console.error('Voice AI SDK: Data channel not open, cannot configure. State:', this.dataChannel.readyState);
+          this._updateUI('error');
           return;
         }
 
@@ -693,7 +928,23 @@
               type: 'session.update',
               session: {
                 modalities: ['text', 'audio'],
-                tools: [],
+                tools: [
+                  {
+                    type: 'function',
+                    name: 'show_booking_popup',
+                    description: 'Show a popup with a button to book a meeting. Use when: (1) User wants to learn more about Improvado, (2) User wants to schedule a demo/meeting, (3) User asks about pricing/implementation details, (4) Conversation requires human representative, (5) User explicitly asks to book a meeting. Provide personalized message about benefits. When using this tool, tell the user directly: "I\'ve opened a booking popup for you. Please click the button to schedule a meeting." After using, end conversation with: "I\'ll be here when you\'re ready to continue. Just click the microphone button again."',
+                    parameters: {
+                      type: 'object',
+                      properties: {
+                        message: {
+                          type: 'string',
+                          description: 'Message to display in the popup'
+                        }
+                      },
+                      required: ['message']
+                    }
+                  }
+                ],
                 turn_detection: {
                   type: 'server_vad',
                   threshold: 0.5,
@@ -705,45 +956,66 @@
               }
             };
             
-            if (this.dataChannel && this.dataChannel.readyState === 'open') {
-              this.dataChannel.send(JSON.stringify(sessionUpdate));
-              
-              // Wait for a short time to ensure session update is processed
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // 2. Send initial message
-              if (this.dataChannel && this.dataChannel.readyState === 'open') {
-                console.log('Voice AI SDK: Sending initial message');
-                const startPrompt = {
-                  type: 'conversation.item.create',
-                  item: {
-                    type: 'message',
-                    role: 'user',
-                    content: [{
-                      type: 'input_text',
-                      text: 'Begin the conversation by introducing yourself as an Improvado representative'
-                    }]
-                  }
-                };
-                
-                this.dataChannel.send(JSON.stringify(startPrompt));
-                
-                // Wait longer before sending response.create to ensure stability
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // 3. Request response creation
-                if (this.dataChannel && this.dataChannel.readyState === 'open') {
-                  console.log('Voice AI SDK: Requesting response creation');
-                  const createResponse = {
-                    type: 'response.create'
-                  };
-                  
-                  this.dataChannel.send(JSON.stringify(createResponse));
-                }
-              }
+            // Check if data channel is still open before sending
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+              console.error('Voice AI SDK: Data channel closed while configuring');
+              this._updateUI('error');
+              return;
             }
+            
+            this.dataChannel.send(JSON.stringify(sessionUpdate));
+            
+            // Wait for a short time to ensure session update is processed
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Check if data channel is still open before sending next message
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+              console.error('Voice AI SDK: Data channel closed while configuring');
+              this._updateUI('error');
+              return;
+            }
+            
+            // 2. Send initial message
+            console.log('Voice AI SDK: Sending initial message');
+            const startPrompt = {
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: 'user',
+                content: [{
+                  type: 'input_text',
+                  text: 'Begin the conversation by introducing yourself as an Improvado representative'
+                }]
+              }
+            };
+            
+            this.dataChannel.send(JSON.stringify(startPrompt));
+            
+            // Wait longer before sending response.create to ensure stability
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Check if data channel is still open before sending final message
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+              console.error('Voice AI SDK: Data channel closed while configuring');
+              this._updateUI('error');
+              return;
+            }
+            
+            // 3. Request response creation
+            console.log('Voice AI SDK: Requesting response creation');
+            const createResponse = {
+              type: 'response.create'
+            };
+            
+            this.dataChannel.send(JSON.stringify(createResponse));
           } catch (error) {
             console.error('Voice AI SDK: Error sending messages:', error);
+            this._updateUI('error');
+            
+            // Call onError callback
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(new Error('Error configuring data channel: ' + error.message));
+            }
           }
         };
         
@@ -791,6 +1063,162 @@
               // Keep responding state until user starts speaking or agent speaks again
               // This prevents showing the volume visualization prematurely
               this._updateUI('responding');
+              break;
+              
+            case 'function_call':
+              // Handle function call from AI agent
+              console.log('Voice AI SDK: Function call received', message.function_call);
+              
+              // Check if function_call and its properties exist
+              if (!message.function_call || !message.function_call.name) {
+                console.error('Voice AI SDK: Invalid function call format', message);
+                this._updateUI('error');
+                return;
+              }
+              
+              // Check if the function exists in our tool handlers
+              const functionName = message.function_call.name;
+              const functionArgs = message.function_call.arguments || {};
+              const functionCallId = message.function_call.id || 'unknown';
+              
+              if (this.toolHandlers[functionName]) {
+                try {
+                  // Execute the function
+                  const result = this.toolHandlers[functionName](functionArgs);
+                  
+                  // Send the result back to the server
+                  if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    const functionResponse = {
+                      type: 'function_call_response',
+                      function_call_id: functionCallId,
+                      result: result
+                    };
+                    
+                    this.dataChannel.send(JSON.stringify(functionResponse));
+                  }
+                } catch (error) {
+                  console.error(`Voice AI SDK: Error executing function ${functionName}`, error);
+                  
+                  // Send error response
+                  if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    const errorResponse = {
+                      type: 'function_call_response',
+                      function_call_id: functionCallId,
+                      error: error.message || 'Error executing function'
+                    };
+                    
+                    this.dataChannel.send(JSON.stringify(errorResponse));
+                  }
+                  
+                  // Update UI to error state
+                  this._updateUI('error');
+                }
+              } else {
+                console.error(`Voice AI SDK: Function ${functionName} not found`);
+                
+                // Send error response
+                if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                  const errorResponse = {
+                    type: 'function_call_response',
+                    function_call_id: functionCallId,
+                    error: `Function ${functionName} not found`
+                  };
+                  
+                  this.dataChannel.send(JSON.stringify(errorResponse));
+                }
+                
+                // Update UI to error state
+                this._updateUI('error');
+              }
+              break;
+              
+            case 'response.function_call_arguments.done':
+              // Handle function call from OpenAI WebRTC API
+              console.log('Voice AI SDK: Function call received from OpenAI', message);
+              
+              // Check if message has the required properties
+              if (!message.name) {
+                console.error('Voice AI SDK: Invalid function call format from OpenAI', message);
+                this._updateUI('error');
+                return;
+              }
+              
+              // Check if the function exists in our tool handlers
+              const openAIFunctionName = message.name;
+              let openAIFunctionArgs = {};
+              const openAIFunctionCallId = message.call_id || 'unknown';
+              
+              // Parse arguments if they exist
+              try {
+                if (message.arguments) {
+                  openAIFunctionArgs = JSON.parse(message.arguments);
+                }
+              } catch (error) {
+                console.error('Voice AI SDK: Error parsing function arguments', error);
+              }
+              
+              if (this.toolHandlers[openAIFunctionName]) {
+                try {
+                  // Set a flag to indicate that a function was called
+                  // This can be used to modify behavior after function calls
+                  this.lastFunctionCalled = openAIFunctionName;
+                  
+                  // Execute the function
+                  const result = this.toolHandlers[openAIFunctionName](openAIFunctionArgs);
+                  
+                  // Send the result back to the server
+                  if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    const functionResponse = {
+                      type: 'conversation.item.create',
+                      item: {
+                        type: 'function_call_output',
+                        call_id: openAIFunctionCallId,
+                        output: JSON.stringify(result)
+                      }
+                    };
+                    
+                    this.dataChannel.send(JSON.stringify(functionResponse));
+                  }
+                } catch (error) {
+                  console.error(`Voice AI SDK: Error executing function ${openAIFunctionName}`, error);
+                  
+                  // Send error response
+                  if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    const errorResponse = {
+                      type: 'conversation.item.create',
+                      item: {
+                        type: 'function_call_output',
+                        call_id: openAIFunctionCallId,
+                        output: JSON.stringify({ error: error.message || 'Error executing function' })
+                      }
+                    };
+                    
+                    this.dataChannel.send(JSON.stringify(errorResponse));
+                  }
+                  
+                  // Update UI to error state
+                  this._updateUI('error');
+                }
+              } else {
+                console.error(`Voice AI SDK: Function ${openAIFunctionName} not found`);
+                
+                // Send error response
+                if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                  const errorResponse = {
+                    type: 'conversation.item.create',
+                    item: {
+                      type: 'function_call_output',
+                      call_id: openAIFunctionCallId,
+                      output: JSON.stringify({ error: `Function ${openAIFunctionName} not found` })
+                    }
+                  };
+                  
+                  this.dataChannel.send(JSON.stringify(errorResponse));
+                }
+                
+                // Update UI to error state
+                this._updateUI('error');
+              }
               break;
               
             case 'error':
@@ -845,6 +1273,18 @@
       _onDataChannelClose() {
         console.log('Voice AI SDK: Data channel closed');
         this.isListening = false;
+        
+        // Update UI to idle state
+        this._updateUI('idle');
+        
+        // Call onEnd callback if session was active
+        if (this.isActive) {
+          this.isActive = false;
+          
+          if (typeof this.config.onEnd === 'function') {
+            this.config.onEnd();
+          }
+        }
       }
   
       /**
@@ -854,6 +1294,19 @@
        */
       _onDataChannelError(error) {
         console.error('Voice AI SDK: Data channel error', error);
+        
+        // Update UI to error state
+        this._updateUI('error');
+        
+        // Call onError callback
+        if (typeof this.config.onError === 'function') {
+          this.config.onError(new Error('Data channel error: ' + (error.message || 'Unknown error')));
+        }
+        
+        // Try to recover by cleaning up and resetting
+        this._cleanupWebRTC();
+        this.isActive = false;
+        this.isListening = false;
       }
   
       /**
@@ -883,10 +1336,51 @@
             break;
             
           case 'disconnected':
-          case 'failed':
-            console.log('Voice AI SDK: WebRTC connection lost');
-            // Don't automatically close the session, just update UI
+            console.log('Voice AI SDK: WebRTC connection disconnected, attempting to recover');
+            // Show error state but don't close the session yet, as it might recover
             this._updateUI('error');
+            
+            // Call onError callback with recoverable flag
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(new Error('WebRTC connection disconnected, attempting to recover'));
+            }
+            
+            // Set a timeout to check if connection recovers
+            setTimeout(() => {
+              if (this.peerConnection && 
+                  (this.peerConnection.connectionState === 'disconnected' || 
+                   this.peerConnection.connectionState === 'failed')) {
+                console.log('Voice AI SDK: WebRTC connection failed to recover, cleaning up');
+                this._cleanupWebRTC();
+                this.isActive = false;
+                this.isListening = false;
+                
+                // Call onEnd callback
+                if (typeof this.config.onEnd === 'function') {
+                  this.config.onEnd();
+                }
+              }
+            }, 5000); // Wait 5 seconds for potential recovery
+            break;
+            
+          case 'failed':
+            console.error('Voice AI SDK: WebRTC connection failed');
+            this._updateUI('error');
+            
+            // Call onError callback
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(new Error('WebRTC connection failed'));
+            }
+            
+            // Clean up resources
+            this._cleanupWebRTC();
+            this.isActive = false;
+            this.isListening = false;
+            
+            // Call onEnd callback
+            if (typeof this.config.onEnd === 'function') {
+              this.config.onEnd();
+            }
             break;
             
           case 'closed':

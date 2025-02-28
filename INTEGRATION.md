@@ -89,6 +89,7 @@ The SDK supports various configuration options:
       language: 'en',
       voice: 'alloy', // OpenAI voice ID
       serverUrl: 'https://your-voice-service.com', // Custom server URL
+      meetingUrl: 'https://calendly.com/your-company/meeting', // URL for booking meetings
       instructions: 'You are a helpful voice assistant for our website.', // Custom instructions for the AI
       customStyles: {
         buttonColor: '#3a86ff',
@@ -124,6 +125,25 @@ The SDK supports various configuration options:
   });
 </script>
 ```
+
+## Configuration Parameters
+
+The SDK accepts the following configuration parameters:
+
+- `clientId`: (Required) Your unique client identifier
+- `serverUrl`: (Required) URL of the Voice AI server
+- `meetingUrl`: (Required) URL for booking meetings, used by the booking popup feature
+- `position`: (Optional) Position of the Voice AI button ('bottom-right', 'bottom-left', 'top-right', 'top-left')
+- `theme`: (Optional) UI theme ('light', 'dark', 'brand')
+- `language`: (Optional) Language for the UI (default: 'en')
+- `voice`: (Optional) OpenAI voice ID (default: 'alloy')
+- `instructions`: (Optional) The agent instructions
+- `customStyles`: (Optional) Custom styling options
+- `onReady`: (Optional) Callback when the SDK is ready
+- `onStart`: (Optional) Callback when a session starts
+- `onEnd`: (Optional) Callback when a session ends
+- `onError`: (Optional) Callback when an error occurs
+- `onMessage`: (Optional) Callback when a message is received
 
 ## API Endpoints
 

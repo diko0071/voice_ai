@@ -16,7 +16,6 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
       - `session/` - Internal session management
     - `v1/` - API endpoints for SDK
       - `auth/validate/` - Client validation
-      - `instructions/` - Voice assistant instructions
       - `sessions/` - Session management
       - `voice/token/` - Voice processing tokens
 - `components/` - React components

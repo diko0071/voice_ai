@@ -12,6 +12,7 @@
     "deploy-sdk": "bash scripts/deploy-sdk.sh"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
     "framer-motion": "^12.0.6",
     "next": "15.1.6",
     "react": "^19.0.0",

@@ -1,66 +1,92 @@
 import { NextResponse } from 'next/server';
 import { validateClient } from '@/lib/security';
 import { logger } from '@/lib/logger';
-import fs from 'fs';
-import path from 'path';
+import { getStorage, StorageType, TextLogData } from '@/lib/storage';
 
-// Define the structure of the text log data
-interface TextLogData {
-  sessionId: string;
-  clientId: string;
-  timestamp: number;
-  type: 'user' | 'assistant';
-  text: string;
-}
-
-// Create logs directory if it doesn't exist
-const ensureLogDirectory = () => {
-  const logsDir = path.join(process.cwd(), 'logs');
-  
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir);
-  }
-  
-  return logsDir;
-};
-
-// Find existing log file by session ID
-const findExistingLogFile = (logsDir: string, sessionId: string): { filePath: string, data: TextLogData[] } | null => {
+export async function GET(request: Request) {
   try {
-    // Check if directory exists
-    if (!fs.existsSync(logsDir)) {
-      return null;
+    // Get sessionId from query parameters
+    const url = new URL(request.url);
+    const sessionId = url.searchParams.get('sessionId');
+    const clientId = url.searchParams.get('clientId');
+    
+    console.log(`[voice/text-log] Received request to get logs: sessionId=${sessionId}, clientId=${clientId}`);
+    
+    if (!sessionId) {
+      console.log('[voice/text-log] Missing sessionId parameter');
+      return NextResponse.json(
+        { error: 'Session ID is required' },
+        { status: 400 }
+      );
     }
     
-    // Read all files in the directory
-    const files = fs.readdirSync(logsDir);
-    
-    // Look for files that end with _sessionId.json
-    const sessionFilePattern = new RegExp(`_${sessionId}\\.json$`);
-    const matchingFile = files.find(file => sessionFilePattern.test(file));
-    
-    if (matchingFile) {
-      const filePath = path.join(logsDir, matchingFile);
-      console.log(`[voice/text-log] Found existing log file for session: ${filePath}`);
-      
-      // Read the file content
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      let data = JSON.parse(fileContent);
-      
-      // Ensure data is an array
-      if (!Array.isArray(data)) {
-        data = [data];
-      }
-      
-      return { filePath, data };
+    if (!clientId) {
+      console.log('[voice/text-log] Missing clientId parameter');
+      return NextResponse.json(
+        { error: 'Client ID is required' },
+        { status: 400 }
+      );
     }
     
-    return null;
+    // Get referer from request headers
+    const referer = request.headers.get('referer') || '';
+    console.log(`[voice/text-log] Request referer: ${referer}`);
+    
+    // Validate client
+    console.log(`[voice/text-log] Validating client: clientId=${clientId}, referer=${referer}`);
+    
+    // Special case for test_client - allow without validation
+    const isTestClient = clientId === 'test_client' || clientId === 'demo_client';
+    let isClientValid = isTestClient;
+    
+    if (!isTestClient) {
+      isClientValid = validateClient(clientId, referer);
+    }
+    
+    console.log(`[voice/text-log] Client validation result: ${isClientValid}${isTestClient ? ' (test client)' : ''}`);
+    
+    if (!isClientValid) {
+      console.log(`[voice/text-log] Client validation failed: clientId=${clientId}, referer=${referer}`);
+      return NextResponse.json(
+        { error: 'Invalid client ID or referer' },
+        { status: 403 }
+      );
+    }
+    
+    // Get storage
+    const storage = getStorage(StorageType.SUPABASE);
+    
+    // Get session logs
+    const logs = await storage.getSessionLogs(sessionId);
+    
+    if (logs.length === 0) {
+      console.log(`[voice/text-log] No logs found for session: ${sessionId}`);
+      return NextResponse.json(
+        { error: 'No logs found for this session' },
+        { status: 404 }
+      );
+    }
+    
+    console.log(`[voice/text-log] Retrieved ${logs.length} logs for session: ${sessionId}`);
+    
+    // Return logs
+    return NextResponse.json({
+      success: true,
+      sessionId,
+      clientId,
+      logs,
+      count: logs.length
+    });
+    
   } catch (error) {
-    console.error(`[voice/text-log] Error finding existing log file:`, error);
-    return null;
+    console.error('[voice/text-log] Error retrieving session logs', error);
+    
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-};
+}
 
 export async function POST(request: Request) {
   try {
@@ -161,71 +187,27 @@ export async function POST(request: Request) {
       clientId,
       timestamp: Date.now(),
       type,
-      text
+      text,
+      isTranscription: isTranscription || undefined,
+      source: body.source
     };
-    
-    // Добавляем дополнительные поля, если это транскрипция
-    if (isTranscription) {
-      (logData as any).isTranscription = true;
-    }
     
     console.log('[voice/text-log] Created log data object');
     
-    // Ensure logs directory exists
-    const logsDir = ensureLogDirectory();
-    console.log(`[voice/text-log] Ensured logs directory exists: ${logsDir}`);
+    // Получаем хранилище
+    const storage = getStorage(StorageType.SUPABASE);
     
-    // Try to find existing log file for this session
-    let existingData: TextLogData[] = [];
-    let filePath: string;
+    // Сохраняем лог в Supabase
+    await storage.saveTextLog(logData);
     
-    const existingFile = findExistingLogFile(logsDir, sessionId);
-    
-    if (existingFile) {
-      // Use existing file
-      existingData = existingFile.data;
-      filePath = existingFile.filePath;
-    } else {
-      // No existing file found, create a new one
-      console.log(`[voice/text-log] No existing log file found, creating new file`);
-      
-      // Use current time for the filename
-      const now = new Date();
-      const dateTimeStr = now.toISOString()
-        .replace('T', '_')
-        .replace(/:/g, '-')
-        .split('.')[0]; // Remove milliseconds
-      
-      // Create filename with date_time_sessionId format
-      const fileName = `${dateTimeStr}_${sessionId}.json`;
-      filePath = path.join(logsDir, fileName);
-    }
-    
-    // Add new log entry
-    existingData.push(logData);
-    console.log(`[voice/text-log] Added new log entry, total entries: ${existingData.length}`);
-    
-    // Write log to file
-    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
-    console.log(`[voice/text-log] Wrote log data to file: ${filePath}`);
-    
-    // Log successful text logging
-    logger.log('Text log saved', { 
-      sessionId, 
-      clientId,
-      type,
-      filePath,
-      entriesCount: existingData.length,
-      isTranscription: isTranscription || undefined
-    });
-    
-    console.log(`[voice/text-log] Text log saved to ${filePath}, total entries: ${existingData.length}${isTranscription ? ', transcription saved' : ''}`);
+    // Получаем количество логов для этой сессии
+    const entriesCount = await storage.getSessionLogCount(sessionId);
     
     // Return success response
     return NextResponse.json({
       success: true,
       message: 'Text log saved successfully',
-      entriesCount: existingData.length,
+      entriesCount,
       isTranscription: isTranscription || undefined
     });
     

@@ -130,10 +130,10 @@ export async function POST(request: Request) {
       );
     }
     
-    if (!type || (type !== 'user' && type !== 'assistant')) {
+    if (!type || (type !== 'user' && type !== 'assistant' && type !== 'error')) {
       console.log('[voice/text-log] Invalid type parameter:', type);
       return NextResponse.json(
-        { error: 'Valid type (user or assistant) is required' },
+        { error: 'Valid type (user, assistant, or error) is required' },
         { status: 400 }
       );
     }

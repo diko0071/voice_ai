@@ -8,29 +8,28 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
   - `page.tsx` - Entry point for the web application
   - `layout.tsx` - Root layout
   - `globals.css` - Global styles
+  - `favicon.ico` - Favicon
   - `api/` - Backend endpoints
-    - `log/` - Application logging
     - `session/` - Session management
-    - `internal/` - Internal API endpoints
-      - `log/` - Internal logging
-      - `session/` - Internal session management
     - `v1/` - API endpoints for SDK
-      - `auth/validate/` - Client validation
+      - `auth/` - Authentication endpoints
+        - `validate/` - Client validation
       - `sessions/` - Session management
-      - `voice/token/` - Voice processing tokens
-- `components/` - React components
-  - `webapp/` - Web application components
-    - `ChatGPT.tsx` - OpenAI voice processing component
-- `hooks/` - Custom React hooks
-  - `logger.ts` - Logging utilities
-  - `webapp/` - Web application hooks
-    - `use-webrtc.ts` - Voice capture via WebRTC
+      - `voice/` - Voice processing endpoints
+        - `process/` - Voice processing
+        - `text-log/` - Text logging
 - `lib/` - Utility libraries
+  - `storage/` - Storage utilities
+  - `supabase.ts` - Supabase client
   - `security.ts` - Client validation
+  - `openai-webrtc.ts` - WebRTC integration with OpenAI
+  - `openai-sessions.ts` - OpenAI session management
   - `sessions.ts` - Session management
+  - `logger.ts` - Logging utilities
 - `prompts/` - OpenAI prompt templates
   - `agent-instructions.ts` - Instructions for the voice assistant
 - `public/` - Static assets
+  - `microphone.svg` - Microphone icon
   - `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` - UI icons
   - `sdk/` - Voice AI SDK files
     - `demo.html` - SDK demo page
@@ -38,19 +37,19 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
     - `voice-ai-sdk.min.js` - Minified SDK
     - `voice-ai-styles.css` - SDK styles
 - `scripts/` - Utility scripts
+  - `simple-supabase-setup.sql` - Supabase setup script
   - `deploy-sdk.sh` - SDK deployment script
+- `data/` - Data files
+  - `text/` - Text data
 - `tests/` - Test files
 - `dist/` - Distribution files (in gitignore, but shown for reference)
   - `sdk/` - Compiled SDK files
-    - `README.md` - SDK documentation
-    - `demo.html` - SDK demo page
-    - `version.json` - SDK version information
-    - `voice-ai-sdk.min.js` - Minified SDK
-    - `voice-ai-styles.css` - SDK styles
+- `middleware.ts` - Next.js middleware
 - `.env.local` - Environment variables (not committed)
   - `NEXT_PUBLIC_OPENAI_API_KEY` - OpenAI API key
   - `ALLOWED_CLIENTS` - Authorized clients
   - `CLIENT_*_DOMAINS` - Allowed domains
+- `.env.local.example` - Example environment variables
 - `next.config.ts` - Next.js config
 - `package.json` - Dependencies
 - `postcss.config.mjs` - PostCSS configuration
@@ -60,9 +59,9 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 - `README.md` - Project documentation
 
 ## Flow
-1. `page.tsx` → `components/webapp/ChatGPT` component
-2. WebRTC captures voice via `hooks/webapp/use-webrtc.ts`
-3. ChatGPT processes commands using prompts from `prompts/agent-instructions.ts`
+1. `page.tsx` renders the main application
+2. OpenAI WebRTC integration via `lib/openai-webrtc.ts`
+3. Voice processing using prompts from `prompts/agent-instructions.ts`
 4. Voice assistant responds to user
 5. SDK enables integration on any website
 

@@ -1,126 +1,104 @@
 # Voice AI: Voice Control Assistant
 
 ## Overview
-Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK for website integration.
+Next.js app with voice commands via WebRTC + OpenAI. Includes JS SDK for website integration.
 
 ## Structure
 - `app/` - Next.js App Router code
-  - `page.tsx` - Entry point for the web application
+  - `page.tsx` - Web app entry point
   - `layout.tsx` - Root layout
   - `globals.css` - Global styles
   - `favicon.ico` - Favicon
   - `api/` - Backend endpoints
-    - `session/` - Session management
-    - `v1/` - API endpoints for SDK
-      - `auth/` - Authentication endpoints
-        - `validate/` - Client validation
+    - `session/` - Session mgmt
+    - `v1/` - SDK API endpoints
+      - `auth/validate/` - Client validation
       - `sessions/` - Session management
-      - `voice/` - Voice processing endpoints
-        - `process/` - Voice processing
-        - `text-log/` - Text logging
-- `analysis/` - Data analysis tools and resources
-  - `README.md` - Analysis documentation
-  - `requirements.txt` - Python dependencies
-  - `notebooks/` - Jupyter notebooks for analysis
-    - `supabase_example.py` - Working example of Supabase connection and data retrieval
-  - `data/` - Data files for analysis (all data files must be stored ONLY here, not in root)
-    - Files with `.forgit` suffix (e.g., `example.forgit.csv`) are committed to Git
-    - All other files are ignored by Git
-  - `scripts/` - Python scripts for analysis
+      - `voice/` - Voice endpoints (process/, text-log/)
+- `analysis/` - Data analysis tools
+  - `README.md` - Analysis docs
+  - `requirements.txt` - Python deps
+  - `notebooks/` - Jupyter notebooks
+    - `supabase_example.py` - Supabase connection example
+  - `data/` - Analysis data files (ONLY store data here, not in root)
+    - `.forgit` suffix files (e.g., `example.forgit.csv`) → committed to Git
+    - All other files → ignored by Git
+  - `scripts/` - Python analysis scripts
 - `lib/` - Utility libraries
-  - `storage/` - Storage utilities
+  - `storage/` - Storage utils
   - `supabase.ts` - Supabase client
   - `security.ts` - Client validation
-  - `openai-webrtc.ts` - WebRTC integration with OpenAI
-  - `openai-sessions.ts` - OpenAI session management
+  - `openai-webrtc.ts` - WebRTC+OpenAI integration
+  - `openai-sessions.ts` - OpenAI session mgmt
   - `sessions.ts` - Session management
   - `logger.ts` - Logging utilities
 - `prompts/` - OpenAI prompt templates
-  - `agent-instructions.ts` - Instructions for the voice assistant
+  - `agent-instructions.ts` - Voice assistant instructions
 - `public/` - Static assets
-  - `microphone.svg` - Microphone icon
-  - `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` - UI icons
-  - `sdk/` - Voice AI SDK files
-    - `demo.html` - SDK demo page
-    - `voice-ai-sdk.js` - Main SDK
-    - `voice-ai-sdk.min.js` - Minified SDK
-    - `voice-ai-styles.css` - SDK styles
+  - Icons: `microphone.svg`, `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`
+  - `sdk/` - Voice AI SDK files (`demo.html`, `voice-ai-sdk.js`, `voice-ai-sdk.min.js`, `voice-ai-styles.css`)
 - `scripts/` - Utility scripts
-  - `simple-supabase-setup.sql` - Supabase setup script (required SQL setup for tables and permissions)
+  - `simple-supabase-setup.sql` - Supabase setup SQL
   - `deploy-sdk.sh` - SDK deployment script
 - `tests/` - Test files
-- `dist/` - Distribution files (in gitignore, but shown for reference)
-  - `sdk/` - Compiled SDK files
+- `dist/` - Build output (gitignored)
+  - `sdk/` - Compiled SDK
 - `middleware.ts` - Next.js middleware
-- `.env.local` - Environment variables (not committed)
+- `.env.local` - Environment vars (not committed)
   - `NEXT_PUBLIC_OPENAI_API_KEY` - OpenAI API key
   - `ALLOWED_CLIENTS` - Authorized clients
   - `CLIENT_*_DOMAINS` - Allowed domains
-- `.env.local.example` - Example environment variables
-- `next.config.ts` - Next.js config
-- `package.json` - Dependencies
-- `postcss.config.mjs` - PostCSS configuration
-- `tailwind.config.ts` - Styling config
-- `tsconfig.json` - TypeScript config
-- `INTEGRATION.md` - SDK integration guide
-- `README.md` - Project documentation
+- `.env.local.example` - Example env vars
+- Config files: `next.config.ts`, `package.json`, `postcss.config.mjs`, `tailwind.config.ts`, `tsconfig.json`
+- Docs: `INTEGRATION.md` (SDK guide), `README.md` (Project docs)
 
 ## Flow
-1. `page.tsx` renders the main application
-2. OpenAI WebRTC integration via `lib/openai-webrtc.ts`
-3. Voice processing using prompts from `prompts/agent-instructions.ts`
-4. Voice assistant responds to user
-5. SDK enables integration on any website
+1. `page.tsx` renders main app
+2. OpenAI WebRTC integration (`lib/openai-webrtc.ts`)
+3. Voice processing via prompts (`prompts/agent-instructions.ts`)
+4. Voice assistant responds
+5. SDK enables website integration
 
 ## Setup
-1. Create `.env.local` from `.env.local.example` - **REQUIRED FIRST STEP**
-   - Copy the `.env.local.example` file to `.env.local`
-   - Fill in your real API keys and secrets in the `.env.local` file
-   - This step is **absolutely necessary** before using ANY functionality in this repository
-   - Both the main web application AND the analysis tools require these environment variables
-2. Add OpenAI API key and client configuration
-3. Set up Supabase by executing the SQL in `scripts/simple-supabase-setup.sql` in your Supabase SQL editor
+1. Create `.env.local` from `.env.local.example` - **REQUIRED FIRST**
+   - Copy `.env.local.example` to `.env.local`
+   - Add your API keys/secrets
+   - **Must do this** before using ANY functionality
+   - Required for both web app AND analysis tools
+2. Add OpenAI API key and client config
+3. Set up Supabase via SQL in `scripts/simple-supabase-setup.sql`
 4. Run `npm run dev`
-5. Open http://localhost:3000 
+5. Open http://localhost:3000
 
 ## Python Analysis Setup
-1. All Python dependencies must be added to `analysis/requirements.txt`, not installed globally
-2. Create a virtual environment in the analysis directory:
+1. Add Python deps to `analysis/requirements.txt` only (not global install)
+2. Create venv in analysis dir:
    ```bash
    cd analysis
    python -m venv .venv
-   source .venv/bin/activate  # On Unix/macOS
+   source .venv/bin/activate  # Unix/macOS
    # or
-   .venv\Scripts\activate     # On Windows
+   .venv\Scripts\activate     # Windows
    ```
-3. Install dependencies from requirements.txt:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. To add new dependencies, update `requirements.txt` and reinstall:
-   ```bash
-   pip install -r requirements.txt
-   ```
-5. Environment variables from the root `.env.local` file can be accessed in Python code:
+3. Install deps: `pip install -r requirements.txt`
+4. For new deps: update `requirements.txt`, then reinstall
+5. Access env vars from root `.env.local`:
    ```python
-   # In any Python script or notebook
    from env_loader import get_env_var
-   
-   # Access the same environment variables used by the main app
    openai_api_key = get_env_var("NEXT_PUBLIC_OPENAI_API_KEY")
    ```
-   **IMPORTANT**: This requires that you have created the `.env.local` file as described in the main Setup section above
-6. Jupyter notebooks are stored in plain text format (`.py` files) with cell markers `# %%`:
-   - This format is compatible with VS Code's Jupyter extension
-   - Allows for better version control and diff viewing
-   - To run these notebooks, use VS Code's "Run Cell" feature or convert to `.ipynb` format if needed
+   **IMPORTANT**: Requires `.env.local` setup as described above
+6. Jupyter notebooks: `.py` files with `# %%` cell markers
+   - Compatible with VS Code Jupyter extension
+   - Better version control/diff viewing
+   - Run via VS Code "Run Cell" or convert to `.ipynb`
 7. Data files:
-   - ALL data files must be stored ONLY in `analysis/data/` directory
-   - NEVER create data files in the root directory
-   - All files in `analysis/data/` are ignored by Git by default
-   - To include a file in Git, add `.forgit` suffix before extension (e.g., `important_data.forgit.csv`) 
+   - Store ONLY in `analysis/data/` dir
+   - NEVER in root dir
+   - All `analysis/data/` files Git-ignored by default
+   - Add `.forgit` suffix to commit to Git (e.g., `important_data.forgit.csv`) 
 8. Supabase connection:
-   - For examples of connecting to Supabase, refer to `analysis/notebooks/supabase_example.py`
-   - This notebook contains a working example of how to connect to Supabase and retrieve data from the `text_logs` table
-   - You can create new IPython notebooks in the same directory to perform your own analysis
-   - The example loads the first 30 records from the `text_logs` table, sorted by creation date (oldest first) 
+   - See `analysis/notebooks/supabase_example.py` for example
+   - Shows Supabase connection + `text_logs` table data retrieval
+   - Create your own notebooks for custom analysis
+   - Example loads first 30 records from `text_logs`, sorted by creation date 

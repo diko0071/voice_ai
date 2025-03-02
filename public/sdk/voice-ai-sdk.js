@@ -60,6 +60,46 @@
           },
           warn: (message, ...args) => {
             console.warn(message, ...args);
+          },
+          // Новая функция для логирования ошибок - и в консоль, и на сервер
+          logError: (message, error, context = {}) => {
+            // Выводим сообщение об ошибке в консоль
+            console.error(message, error);
+            
+            // Если у нас есть сессия и клиент, отправляем ошибку на сервер
+            if (this.sessionId) {
+              // Собираем информацию об ошибке
+              let errorText = message || '';
+              
+              // Добавляем stacktrace, если доступен
+              if (error && error.stack) {
+                errorText += '\nStacktrace: ' + error.stack;
+              } else if (error && error.message) {
+                errorText += '\nError: ' + error.message;
+              } else if (error) {
+                // Если это не объект Error, преобразуем в строку
+                try {
+                  errorText += '\nError: ' + JSON.stringify(error);
+                } catch (e) {
+                  errorText += '\nError: ' + String(error);
+                }
+              }
+              
+              // Добавляем дополнительный контекст
+              if (Object.keys(context).length > 0) {
+                try {
+                  errorText += '\nContext: ' + JSON.stringify(context);
+                } catch (e) {
+                  errorText += '\nContext: Unable to stringify context';
+                }
+              }
+              
+              // Отправляем ошибку на сервер, используя существующий метод
+              this._logTextToAPI('error', errorText, {
+                source: 'client_error',
+                ...context
+              });
+            }
           }
         };
         
@@ -67,19 +107,23 @@
         let hasErrors = false;
         
         if (!this.clientId) {
-          console.error('Voice AI SDK: Client ID is required. Please provide a valid clientId in the configuration.');
+          this.logger.logError('Voice AI SDK: Client ID is required. Please provide a valid clientId in the configuration.');
           hasErrors = true;
         }
         
         if (!this.config.serverUrl) {
-          console.error('Voice AI SDK: Server URL is required. Please provide a valid serverUrl in the configuration.');
-          console.error('Example: serverUrl: "https://voice-ai-sandy.vercel.app"');
+          this.logger.logError('Voice AI SDK: Server URL is required. Please provide a valid serverUrl in the configuration.', null, {
+            example: 'https://voice-ai-sandy.vercel.app'
+          });
+          this.logger.logError('Example: serverUrl: "https://voice-ai-sandy.vercel.app"');
           hasErrors = true;
         }
         
         if (!this.meetingUrl) {
-          console.error('Voice AI SDK: Meeting URL is required. Please provide a valid meetingUrl in the configuration.');
-          console.error('Example: meetingUrl: "https://calendly.com/your-company/meeting"');
+          this.logger.logError('Voice AI SDK: Meeting URL is required. Please provide a valid meetingUrl in the configuration.', null, {
+            example: 'https://calendly.com/your-company/meeting'
+          });
+          this.logger.logError('Example: meetingUrl: "https://calendly.com/your-company/meeting"');
           hasErrors = true;
         }
         
@@ -88,7 +132,7 @@
           try {
             new URL(this.config.serverUrl);
           } catch (e) {
-            console.error(`Voice AI SDK: Invalid Server URL "${this.config.serverUrl}". Please provide a valid URL.`);
+            this.logger.logError(`Voice AI SDK: Invalid Server URL "${this.config.serverUrl}". Please provide a valid URL.`, e);
             hasErrors = true;
           }
         }
@@ -98,7 +142,7 @@
           try {
             new URL(this.meetingUrl);
           } catch (e) {
-            console.error(`Voice AI SDK: Invalid Meeting URL "${this.meetingUrl}". Please provide a valid URL.`);
+            this.logger.logError(`Voice AI SDK: Invalid Meeting URL "${this.meetingUrl}". Please provide a valid URL.`, e);
             hasErrors = true;
           }
         }
@@ -108,7 +152,7 @@
         console.log('Voice AI SDK: Server URL:', this.config.serverUrl);
         
         if (hasErrors) {
-          console.error('Voice AI SDK: Initialization failed due to configuration errors.');
+          this.logger.logError('Voice AI SDK: Initialization failed due to configuration errors.');
           return;
         }
         
@@ -149,7 +193,7 @@
             this.config.onReady();
           }
         } catch (error) {
-          console.error('Voice AI SDK: Initialization error', error);
+          this.logger.logError('Voice AI SDK: Initialization error', error);
           
           // Call onError callback
           if (typeof this.config.onError === 'function') {
@@ -399,8 +443,12 @@
             }
             
             if (errorStatus === 403) {
-              console.error(`Voice AI SDK: Domain "${window.location.hostname}" is not authorized for client "${this.clientId}".`);
-              console.error('Voice AI SDK: Make sure your domain is added to the CLIENT_' + this.clientId + '_DOMAINS environment variable on the server.');
+              this.logger.logError(`Voice AI SDK: Domain "${window.location.hostname}" is not authorized for client "${this.clientId}".`, null, {
+                clientId: this.clientId,
+                domain: window.location.hostname,
+                statusCode: errorStatus
+              });
+              this.logger.logError('Voice AI SDK: Make sure your domain is added to the CLIENT_' + this.clientId + '_DOMAINS environment variable on the server.');
               throw new Error(errorData.error || `Domain not authorized. Status: ${errorStatus}`);
             } else {
               throw new Error(errorData.error || `Client validation failed. Status: ${errorStatus}`);
@@ -415,13 +463,17 @@
           
           console.log('Voice AI SDK: Client validated successfully');
         } catch (error) {
-          console.error('Voice AI SDK: Client validation failed', error);
+          this.logger.logError('Voice AI SDK: Client validation failed', error, {
+            clientId: this.clientId,
+            serverUrl: this.config.serverUrl,
+            domain: window.location.hostname
+          });
           
           // Check if it's a network error (CORS, connection refused, etc.)
           if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-            console.error(`Voice AI SDK: Network error occurred. This might be due to CORS restrictions.`);
-            console.error(`Voice AI SDK: Make sure your domain "${window.location.hostname}" is added to the CLIENT_${this.clientId}_DOMAINS environment variable on the server.`);
-            console.error(`Voice AI SDK: Also check that the serverUrl "${this.config.serverUrl}" is correct and accessible.`);
+            this.logger.logError(`Voice AI SDK: Network error occurred. This might be due to CORS restrictions.`, error);
+            this.logger.logError(`Voice AI SDK: Make sure your domain "${window.location.hostname}" is added to the CLIENT_${this.clientId}_DOMAINS environment variable on the server.`);
+            this.logger.logError(`Voice AI SDK: Also check that the serverUrl "${this.config.serverUrl}" is correct and accessible.`);
           }
           
           throw error;
@@ -833,9 +885,6 @@
             if (response.status === 404 && data.newSessionId) {
               this.logger.log('Server provided new session ID:', data.newSessionId);
               this.sessionId = data.newSessionId;
-              this._saveSession();
-              
-              // Add a delay before retrying to allow the server to fully register the session
               this.logger.debug('Waiting for session to be fully registered...');
               return new Promise(resolve => {
                 setTimeout(async () => {
@@ -1134,7 +1183,9 @@
               
               // Check if function_call and its properties exist
               if (!message.function_call || !message.function_call.name) {
-                console.error('Voice AI SDK: Invalid function call format', message);
+                this.logger.logError('Voice AI SDK: Invalid function call format', message, {
+                  messageType: message.type
+                });
                 this._updateUI('error');
                 return;
               }
@@ -1160,7 +1211,11 @@
                     this.dataChannel.send(JSON.stringify(functionResponse));
                   }
                 } catch (error) {
-                  console.error(`Voice AI SDK: Error executing function ${functionName}`, error);
+                  this.logger.logError(`Voice AI SDK: Error executing function ${functionName}`, error, {
+                    functionName,
+                    functionArgs,
+                    functionCallId
+                  });
                   
                   // Send error response
                   if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -1177,7 +1232,10 @@
                   this._updateUI('error');
                 }
               } else {
-                console.error(`Voice AI SDK: Function ${functionName} not found`);
+                this.logger.logError(`Voice AI SDK: Function ${functionName} not found`, null, {
+                  functionName,
+                  availableFunctions: Object.keys(this.toolHandlers)
+                });
                 
                 // Send error response
                 if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -1201,7 +1259,9 @@
               
               // Check if message has the required properties
               if (!message.name) {
-                console.error('Voice AI SDK: Invalid function call format from OpenAI', message);
+                this.logger.logError('Voice AI SDK: Invalid function call format from OpenAI', message, {
+                  messageType: message.type
+                });
                 this._updateUI('error');
                 return;
               }
@@ -1217,7 +1277,10 @@
                   openAIFunctionArgs = JSON.parse(message.arguments);
                 }
               } catch (error) {
-                console.error('Voice AI SDK: Error parsing function arguments', error);
+                this.logger.logError('Voice AI SDK: Error parsing function arguments', error, {
+                  rawArguments: message.arguments,
+                  functionName: openAIFunctionName
+                });
               }
               
               if (this.toolHandlers[openAIFunctionName]) {
@@ -1243,7 +1306,11 @@
                     this.dataChannel.send(JSON.stringify(functionResponse));
                   }
                 } catch (error) {
-                  console.error(`Voice AI SDK: Error executing function ${openAIFunctionName}`, error);
+                  this.logger.logError(`Voice AI SDK: Error executing function ${openAIFunctionName}`, error, {
+                    functionName: openAIFunctionName,
+                    functionArgs: openAIFunctionArgs,
+                    functionCallId: openAIFunctionCallId
+                  });
                   
                   // Send error response
                   if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -1263,7 +1330,10 @@
                   this._updateUI('error');
                 }
               } else {
-                console.error(`Voice AI SDK: Function ${openAIFunctionName} not found`);
+                this.logger.logError(`Voice AI SDK: Function ${openAIFunctionName} not found`, null, {
+                  functionName: openAIFunctionName,
+                  availableFunctions: Object.keys(this.toolHandlers)
+                });
                 
                 // Send error response
                 if (this.dataChannel && this.dataChannel.readyState === 'open') {
@@ -1285,7 +1355,10 @@
               break;
               
             case 'error':
-              console.error('Voice AI SDK: Error from server', message.error);
+              this.logger.logError('Voice AI SDK: Error from server', message.error, {
+                messageType: message.type,
+                errorDetails: message
+              });
               
               // Call onError callback
               if (typeof this.config.onError === 'function') {
@@ -1323,7 +1396,9 @@
               break;
           }
         } catch (error) {
-          console.error('Voice AI SDK: Error parsing message', error);
+          this.logger.logError('Voice AI SDK: Error parsing message', error, {
+            rawMessage: event.data ? (typeof event.data === 'string' ? event.data.substring(0, 200) + '...' : 'non-string data') : 'empty data'
+          });
         }
       }
   
@@ -1557,7 +1632,10 @@
             this.config.onStart();
           }
         } catch (error) {
-          this.logger.error('Failed to start session', error);
+          this.logger.logError('Failed to start session', error, {
+            sessionId: this.sessionId,
+            clientId: this.clientId
+          });
           
           // Clean up resources
           this._cleanupWebRTC();
@@ -1865,12 +1943,15 @@
         try {
           // Validate session ID
           if (!this.sessionId) {
-            console.error('Voice AI SDK: Cannot log text: No session ID available');
+            this.logger.logError('Voice AI SDK: Cannot log text: No session ID available', null, {
+              textType: type,
+              options
+            });
             return;
           }
           
           // Normalize type
-          const normalizedType = (type === 'user' || type === 'assistant') ? type : 'assistant';
+          const normalizedType = (type === 'user' || type === 'assistant' || type === 'error') ? type : 'assistant';
           
           // Handle different text formats
           let textToLog = '';
@@ -1893,12 +1974,18 @@
               try {
                 textToLog = JSON.stringify(text);
               } catch (e) {
-                console.error('Voice AI SDK: Cannot convert object to string for logging', e);
+                this.logger.logError('Voice AI SDK: Cannot convert object to string for logging', e, {
+                  textObject: typeof text,
+                  textType: type
+                });
                 return;
               }
             }
           } else if (text === null || text === undefined) {
-            console.error('Voice AI SDK: Cannot log null or undefined text');
+            this.logger.logError('Voice AI SDK: Cannot log null or undefined text', null, {
+              textType: type,
+              options
+            });
             return;
           } else {
             // Try to convert to string
@@ -1944,7 +2031,11 @@
           .then(response => {
             if (!response.ok) {
               return response.json().then(data => {
-                console.error('Voice AI SDK: Text logging failed:', data);
+                this.logger.logError('Voice AI SDK: Text logging failed:', data, {
+                  status: response.status,
+                  sessionId: this.sessionId,
+                  textType: normalizedType
+                });
                 throw new Error(`Failed to log text: ${data.error || response.status}`);
               });
             }
@@ -1954,8 +2045,14 @@
             this.logger.debug('Text logged successfully to API:', data);
           })
           .catch(error => {
-            this.logger.error('Error logging text to API:', error);
-            console.error('Voice AI SDK: Error logging text to API:', error);
+            this.logger.logError('Voice AI SDK: Error logging text to API:', error, {
+              sessionId: this.sessionId,
+              clientId: this.clientId,
+              textType: normalizedType,
+              textLength: trimmedText.length,
+              isTranscription,
+              source: options.source
+            });
             
             // Try to log the error details for debugging
             console.error('Voice AI SDK: Failed text log details:', {
@@ -1967,8 +2064,11 @@
             });
           });
         } catch (error) {
-          this.logger.error('Error preparing text log request:', error);
-          console.error('Voice AI SDK: Error preparing text log request:', error);
+          this.logger.logError('Voice AI SDK: Error preparing text log request:', error, {
+            sessionId: this.sessionId,
+            clientId: this.clientId,
+            textType: typeof text
+          });
           
           // Try to log the error details for debugging
           try {

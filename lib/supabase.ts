@@ -18,7 +18,7 @@ export interface Database {
           session_id: string;
           client_id: string;
           timestamp: number;
-          type: 'user' | 'assistant';
+          type: 'user' | 'assistant' | 'error';
           text: string;
           is_transcription: boolean | null;
           source: string | null;
@@ -29,7 +29,7 @@ export interface Database {
           session_id: string;
           client_id: string;
           timestamp: number;
-          type: 'user' | 'assistant';
+          type: 'user' | 'assistant' | 'error';
           text: string;
           is_transcription?: boolean | null;
           source?: string | null;
@@ -40,7 +40,7 @@ export interface Database {
           session_id?: string;
           client_id?: string;
           timestamp?: number;
-          type?: 'user' | 'assistant';
+          type?: 'user' | 'assistant' | 'error';
           text?: string;
           is_transcription?: boolean | null;
           source?: string | null;

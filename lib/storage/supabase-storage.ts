@@ -6,7 +6,7 @@ export interface TextLogData {
   sessionId: string;
   clientId: string;
   timestamp: number;
-  type: 'user' | 'assistant';
+  type: 'user' | 'assistant' | 'error';
   text: string;
   isTranscription?: boolean;
   source?: string;

@@ -12,7 +12,7 @@ interface OpenAISessionsStore {
 const openAISessions: OpenAISessionsStore = {};
 
 // Session expiry time in milliseconds (30 minutes by default)
-const SESSION_EXPIRY_MS = parseInt(process.env.SESSION_EXPIRY_MINUTES || '30') * 60 * 1000;
+const SESSION_EXPIRY_MS = 0.5 * 60 * 1000;
 
 /**
  * Get an OpenAI session by ID

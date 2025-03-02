@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       logger.log('Session validation request', { sessionId });
       console.log('Session validation request', { sessionId });
       
-      const session = getSession(sessionId);
+      const session = await getSession(sessionId);
       
       if (!session) {
         logger.log('Session validation failed - session not found', { sessionId });
@@ -52,8 +52,8 @@ export async function GET(request: Request) {
       );
     }
     
-    const sessionCount = getSessionCount();
-    const sessions = getAllSessions();
+    const sessionCount = await getSessionCount();
+    const sessions = await getAllSessions();
     
     return NextResponse.json({
       count: sessionCount,
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     }
     
     // Create a new session
-    const session = createSession(clientId);
+    const session = await createSession(clientId);
     
     logger.log('New session created via API', { sessionId: session.sessionId, clientId });
     console.log('New session created via API', { sessionId: session.sessionId, clientId });
@@ -149,7 +149,7 @@ export async function DELETE(request: Request) {
     }
     
     // Get session
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     
     if (!session) {
       return NextResponse.json(
@@ -159,7 +159,7 @@ export async function DELETE(request: Request) {
     }
     
     // Delete session
-    const success = deleteSession(sessionId);
+    const success = await deleteSession(sessionId);
     
     if (!success) {
       return NextResponse.json(

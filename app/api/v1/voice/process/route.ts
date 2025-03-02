@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { validateClient } from '@/lib/security';
 import { getSession, createSession } from '@/lib/sessions';
-import { getOpenAISession, createOpenAISession } from '@/lib/openai-sessions';
+import { getOpenAISession, createOpenAISession, deleteOpenAISession } from '@/lib/openai-sessions';
 import { logger } from '@/lib/logger';
 import { agentInstructions } from '@/prompts/agent-instructions';
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
     
     // Get session
-    let session = getSession(sessionId);
+    let session = await getSession(sessionId);
     let isSessionValid = !!session;
     console.log(`[voice/process] Session validation result: ${isSessionValid}`);
     
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       console.log(`[voice/process] Session not found: ${sessionId}`);
       
       // Create a new session
-      session = createSession(clientId);
+      session = await createSession(clientId);
       console.log(`[voice/process] Created new session: ${session.sessionId}`);
       
       // Return the new session ID with the error
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     
     // Get OpenAI session
     let openAISession = getOpenAISession(sessionId);
-    const openAISessionExists = !!openAISession;
+    let openAISessionExists = !!openAISession;
     console.log(`[voice/process] OpenAI session exists: ${openAISessionExists}`);
     
     // Create OpenAI session if it doesn't exist
@@ -130,8 +130,48 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error('[voice/process] Failed to process WebRTC offer', error);
       
+      // Если ошибка содержит строку "already has an active response", это значит, что
+      // OpenAI сессия устарела или повреждена. Нужно пересоздать сессию.
+      if (error instanceof Error && error.message && (
+          error.message.includes('already has an active response') || 
+          error.message.includes('conversation_not_found') ||
+          error.message.includes('Connection error')
+        )) {
+        console.log('[voice/process] Detected stale OpenAI session, recreating...');
+        
+        // Удаляем старую сессию
+        deleteOpenAISession(sessionId);
+        
+        // Создаем новую сессию
+        try {
+          openAISession = await createOpenAISession(sessionId, clientId, voice || 'alloy');
+          console.log(`[voice/process] Recreated OpenAI session successfully: ${sessionId}`);
+          
+          // Пробуем снова обработать предложение
+          const answer = await openAISession.processOffer(offer);
+          console.log(`[voice/process] WebRTC offer processed successfully after session recreation`);
+          
+          // Возвращаем ответ и инструкции
+          return NextResponse.json({
+            answer,
+            instructions: agentInstructions
+          });
+        } catch (recreateError) {
+          console.error('[voice/process] Failed to recreate OpenAI session', recreateError);
+          
+          return NextResponse.json({
+            error: 'Failed to process WebRTC offer after session recreation',
+            details: recreateError instanceof Error ? recreateError.message : String(recreateError),
+            newSession: true
+          }, { status: 500 });
+        }
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to process WebRTC offer' },
+        { 
+          error: 'Failed to process WebRTC offer', 
+          details: error instanceof Error ? error.message : String(error) 
+        },
         { status: 500 }
       );
     }

@@ -36,9 +36,6 @@ NEXT_PUBLIC_APP_URL=https://your-voice-service.com
 ALLOWED_CLIENTS=your_client_id
 CLIENT_your_client_id_DOMAINS=yourdomain.com,www.yourdomain.com
 
-# Session Configuration
-SESSION_EXPIRY_MINUTES=30
-
 # Logging Configuration
 LOG_LEVEL=info
 ```

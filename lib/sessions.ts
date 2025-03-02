@@ -3,19 +3,15 @@
  */
 
 import { logger } from '@/lib/logger';
+import { supabase } from './supabase';
 
 interface Session {
   sessionId: string;
   clientId: string;
   createdAt: number;
   lastActive: number;
+  metadata?: any;
 }
-
-// In-memory session store
-const sessions: Record<string, Session> = {};
-
-// Session expiry time in milliseconds (30 minutes by default)
-const SESSION_EXPIRY_MS = parseInt(process.env.SESSION_EXPIRY_MINUTES || '60') * 60 * 1000;
 
 /**
  * Generate a random session ID
@@ -32,14 +28,9 @@ function generateSessionId(): string {
 /**
  * Create a new session
  */
-export function createSession(clientId: string): Session {
+export async function createSession(clientId: string): Promise<Session> {
   // Generate a unique session ID
   let sessionId = generateSessionId();
-  
-  // Ensure the session ID is unique
-  while (sessions[sessionId]) {
-    sessionId = generateSessionId();
-  }
   
   // Create the session
   const now = Date.now();
@@ -50,11 +41,30 @@ export function createSession(clientId: string): Session {
     lastActive: now
   };
   
-  // Store the session
-  sessions[sessionId] = session;
-  
-  logger.log('Session created', { sessionId, clientId });
-  console.log('Session created', { sessionId, clientId });
+  // Store the session in Supabase
+  try {
+    const { error } = await supabase
+      .from('sessions')
+      .insert({
+        session_id: sessionId,
+        client_id: clientId,
+        last_active: now,
+        metadata: {}
+      });
+    
+    if (error) {
+      logger.error('Error creating session in Supabase', error);
+      console.error('Error creating session in Supabase', error);
+      throw error;
+    }
+    
+    logger.log('Session created in Supabase', { sessionId, clientId });
+    console.log('Session created in Supabase', { sessionId, clientId });
+  } catch (error) {
+    logger.error('Failed to create session in Supabase', error);
+    console.error('Failed to create session in Supabase', error);
+    throw error;
+  }
   
   return session;
 }
@@ -62,95 +72,173 @@ export function createSession(clientId: string): Session {
 /**
  * Get a session by ID
  */
-export function getSession(sessionId: string): Session | null {
-  const session = sessions[sessionId];
-  
-  if (!session) {
-    logger.log('Session not found', { sessionId });
-    console.log('Session not found', { sessionId });
+export async function getSession(sessionId: string): Promise<Session | null> {
+  try {
+    // Get session from Supabase
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found error
+        logger.log('Session not found in Supabase', { sessionId });
+        console.log('Session not found in Supabase', { sessionId });
+        return null;
+      }
+      
+      logger.error('Error getting session from Supabase', error);
+      console.error('Error getting session from Supabase', error);
+      throw error;
+    }
+    
+    if (!data) {
+      logger.log('Session not found in Supabase', { sessionId });
+      console.log('Session not found in Supabase', { sessionId });
+      return null;
+    }
+    
+    // Update last active time
+    const now = Date.now();
+    
+    // Update Supabase record
+    const { error: updateError } = await supabase
+      .from('sessions')
+      .update({
+        last_active: now
+      })
+      .eq('session_id', sessionId);
+    
+    if (updateError) {
+      logger.error('Error updating session last_active time in Supabase', updateError);
+      console.error('Error updating session last_active time in Supabase', updateError);
+      // Don't throw error here, just log it - we still want to return the session
+    }
+    
+    // Convert from Supabase format to our format
+    const session: Session = {
+      sessionId: data.session_id,
+      clientId: data.client_id,
+      createdAt: new Date(data.created_at).getTime(),
+      lastActive: now, // Use the updated value
+      metadata: data.metadata
+    };
+    
+    logger.log('Session retrieved from Supabase', { sessionId, clientId: session.clientId });
+    console.log('Session retrieved from Supabase', { sessionId, clientId: session.clientId });
+    
+    return session;
+  } catch (error) {
+    logger.error('Failed to get session from Supabase', error);
+    console.error('Failed to get session from Supabase', error);
     return null;
   }
-  
-  // Check if the session has expired
-  const now = Date.now();
-  if (now - session.lastActive > SESSION_EXPIRY_MS) {
-    // Session has expired, delete it
-    deleteSession(sessionId);
-    logger.log('Session expired', { sessionId });
-    console.log('Session expired', { sessionId });
-    return null;
-  }
-  
-  // Update last active time
-  session.lastActive = now;
-  
-  logger.log('Session retrieved', { sessionId, clientId: session.clientId });
-  console.log('Session retrieved', { sessionId, clientId: session.clientId });
-  
-  return session;
 }
 
 /**
  * Delete a session
  */
-export function deleteSession(sessionId: string): boolean {
-  if (!sessions[sessionId]) {
-    return false;
-  }
-  
-  const clientId = sessions[sessionId].clientId;
-  
-  // Delete the session
-  delete sessions[sessionId];
-  
-  logger.log('Session deleted', { sessionId, clientId });
-  console.log('Session deleted', { sessionId, clientId });
-  
-  return true;
-}
-
-/**
- * Clean up expired sessions
- */
-export function cleanupExpiredSessions(): void {
-  const now = Date.now();
-  let expiredCount = 0;
-  
-  Object.keys(sessions).forEach(sessionId => {
-    const session = sessions[sessionId];
-    if (now - session.lastActive > SESSION_EXPIRY_MS) {
-      deleteSession(sessionId);
-      expiredCount++;
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  try {
+    // Delete the session from Supabase
+    const { error } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('session_id', sessionId);
+    
+    if (error) {
+      logger.error('Error deleting session from Supabase', error);
+      console.error('Error deleting session from Supabase', error);
+      return false;
     }
-  });
-  
-  if (expiredCount > 0) {
-    logger.log('Expired sessions cleaned up', { count: expiredCount });
-    console.log('Expired sessions cleaned up', { count: expiredCount });
+    
+    logger.log('Session deleted from Supabase', { sessionId });
+    console.log('Session deleted from Supabase', { sessionId });
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to delete session from Supabase', error);
+    console.error('Failed to delete session from Supabase', error);
+    return false;
   }
 }
 
 /**
  * Check if a session exists
  */
-export function sessionExists(sessionId: string): boolean {
-  return !!sessions[sessionId];
+export async function sessionExists(sessionId: string): Promise<boolean> {
+  try {
+    const { count, error } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+    
+    if (error) {
+      logger.error('Error checking if session exists in Supabase', error);
+      console.error('Error checking if session exists in Supabase', error);
+      return false;
+    }
+    
+    return count !== null && count > 0;
+  } catch (error) {
+    logger.error('Failed to check if session exists in Supabase', error);
+    console.error('Failed to check if session exists in Supabase', error);
+    return false;
+  }
 }
 
 /**
  * Get all active sessions
  */
-export function getAllSessions(): Session[] {
-  return Object.values(sessions);
+export async function getAllSessions(): Promise<Session[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      logger.error('Error getting all sessions from Supabase', error);
+      console.error('Error getting all sessions from Supabase', error);
+      return [];
+    }
+    
+    // Convert from Supabase format to our format
+    return data.map(item => ({
+      sessionId: item.session_id,
+      clientId: item.client_id,
+      createdAt: new Date(item.created_at).getTime(),
+      lastActive: item.last_active,
+      metadata: item.metadata
+    }));
+  } catch (error) {
+    logger.error('Failed to get all sessions from Supabase', error);
+    console.error('Failed to get all sessions from Supabase', error);
+    return [];
+  }
 }
 
 /**
  * Get session count
  */
-export function getSessionCount(): number {
-  return Object.keys(sessions).length;
-}
-
-// Clean up expired sessions every 5 minutes
-// Use .unref() to prevent the timer from keeping the Node.js process alive during tests
-setInterval(cleanupExpiredSessions, 5 * 60 * 1000).unref(); 
+export async function getSessionCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true });
+    
+    if (error) {
+      logger.error('Error getting session count from Supabase', error);
+      console.error('Error getting session count from Supabase', error);
+      return 0;
+    }
+    
+    return count || 0;
+  } catch (error) {
+    logger.error('Failed to get session count from Supabase', error);
+    console.error('Failed to get session count from Supabase', error);
+    return 0;
+  }
+} 

@@ -14,7 +14,6 @@ global.fetch = jest.fn() as any;
 process.env.ALLOWED_CLIENTS = 'test_client_1,test_client_2';
 process.env.CLIENT_test_client_1_DOMAINS = 'example.com,test.com';
 process.env.CLIENT_test_client_2_DOMAINS = 'example.org,test.org';
-process.env.SESSION_EXPIRY_MINUTES = '60';
 
 // Silence console logs during tests
 console.log = jest.fn() as any;

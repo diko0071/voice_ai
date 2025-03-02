@@ -129,4 +129,50 @@ export class SupabaseStorage {
       throw error;
     }
   }
+
+  /**
+   * Получает историю сообщений для сессии, подходящую для восстановления контекста OpenAI
+   * Возвращает все сообщения без преобразований
+   */
+  async getSessionMessages(sessionId: string): Promise<TextLogData[]> {
+    try {
+      console.log(`[storage] Getting session messages for OpenAI context, sessionId: ${sessionId}`);
+      
+      const { data, error } = await supabase
+        .from('text_logs')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('timestamp', { ascending: true });
+      
+      if (error) {
+        console.error('[storage] Error getting session messages from Supabase', error);
+        return [];
+      }
+      
+      // Преобразуем данные из формата Supabase в формат приложения
+      const messages = data.map(item => ({
+        sessionId: item.session_id,
+        clientId: item.client_id,
+        timestamp: item.timestamp,
+        type: item.type,
+        text: item.text,
+        isTranscription: item.is_transcription || undefined,
+        source: item.source || undefined
+      }));
+      
+      console.log(`[storage] Found ${messages.length} messages for context restoration, sessionId: ${sessionId}`);
+      
+      // Логируем количество сообщений каждого типа
+      const userMessages = messages.filter(m => m.type === 'user').length;
+      const assistantMessages = messages.filter(m => m.type === 'assistant').length;
+      const errorMessages = messages.filter(m => m.type === 'error').length;
+      
+      console.log(`[storage] Message breakdown - User: ${userMessages}, Assistant: ${assistantMessages}, Error: ${errorMessages}`);
+      
+      return messages;
+    } catch (error) {
+      console.error(`[storage] Failed to get session messages for OpenAI context, sessionId: ${sessionId}`, error);
+      return [];
+    }
+  }
 } 

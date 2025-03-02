@@ -23,4 +23,9 @@ export interface StorageProvider {
    * Удаляет все логи для указанной сессии
    */
   deleteSessionLogs(sessionId: string): Promise<void>;
+  
+  /**
+   * Получает историю сообщений для сессии, подходящую для восстановления контекста OpenAI
+   */
+  getSessionMessages(sessionId: string): Promise<TextLogData[]>;
 } 

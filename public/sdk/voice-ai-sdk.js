@@ -32,7 +32,6 @@
         this.analyser = null;
         this.volumeInterval = null;
         this.currentVolume = 0;
-        this.messages = [];
         this.ui = null;
         this.mode = 'idle';
         this.sessionValidationInProgress = false;
@@ -862,7 +861,10 @@
           const offer = await this.peerConnection.createOffer();
           await this.peerConnection.setLocalDescription(offer);
           
-          // Send offer to our server
+          // Send minimal data to the server - the server already has everything else it needs
+          this.logger.log('Sending WebRTC offer to server');
+          console.log('Voice AI SDK: Sending WebRTC offer to server');
+          
           const response = await fetch(`${this.config.serverUrl}/api/v1/voice/process`, {
             method: 'POST',
             headers: {
@@ -917,16 +919,13 @@
           // Set remote description
           await this.peerConnection.setRemoteDescription(data.answer);
           
-          // Save instructions
-          this.instructions = data.instructions;
-          
-          // Keep the loading state until the data channel opens
-          // The UI will be updated in _onDataChannelOpen
+          this.logger.log('WebRTC session configured successfully', { sessionId: this.sessionId });
+          console.log('Voice AI SDK: WebRTC session configured successfully');
           
           return true;
         } catch (error) {
-          this.logger.error('Session configuration failed', error);
-          this._updateUI('error');
+          this.logger.error('Failed to configure session', error);
+          console.error('Voice AI SDK: Failed to configure session:', error);
           throw error;
         }
       }
@@ -949,7 +948,7 @@
       }
   
       /**
-       * Configure data channel with session settings and initial prompt
+       * Configure the data channel once it's open
        * @private
        */
       _configureDataChannel() {
@@ -966,63 +965,27 @@
         }
 
         this.logger.log('Configuring data channel');
-        console.log('Voice AI SDK: Configuring data channel');
+        console.log('Voice AI SDK: Configuring data channel - optimized, no session.update');
 
-        // Send messages in sequence with proper timing
+        // Упрощенная версия: отправляем только начальное сообщение и запрос на ответ
         const sendMessages = async () => {
           try {
-            // 1. Send session update
-            this.logger.debug('Sending session update');
-            console.log('Voice AI SDK: Sending session update');
-            const sessionUpdate = {
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                tools: [
-                  {
-                    type: 'function',
-                    name: 'show_booking_popup',
-                    description: 'Show a popup with a button to book a meeting. Use when: (1) User wants to learn more about Improvado, (2) User wants to schedule a demo/meeting, (3) User asks about pricing/implementation details, (4) Conversation requires human representative, (5) User explicitly asks to book a meeting. Provide personalized message about benefits. When using this tool, tell the user directly: "I\'ve opened a booking popup for you. Please click the button to schedule a meeting." After using, end conversation with: "I\'ll be here when you\'re ready to continue. Just click the microphone button again."',
-                    parameters: {
-                      type: 'object',
-                      properties: {}
-                    }
-                  }
-                ],
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 200,
-                  create_response: true
-                },
-                input_audio_transcription: {
-                  model: "whisper-1"
-                },
-                instructions: this.instructions
+            // Функция проверки канала
+            const checkChannel = () => {
+              if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+                this.logger.error('Data channel closed while configuring');
+                this._updateUI('error');
+                return false;
               }
+              return true;
             };
+
+            // 1. Отправляем начальное сообщение и запрос на ответ в одной цепочке
+            if (!checkChannel()) return;
             
-            // Check if data channel is still open before sending
-            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              this.logger.error('Data channel closed while configuring');
-              this._updateUI('error');
-              return;
-            }
+            console.log('Voice AI SDK: Sending initial user message and response request');
             
-            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
-            await this.dataChannel.send(JSON.stringify(sessionUpdate));
-            console.log('Voice AI SDK: Session update sent');
-            
-            // Check if data channel is still open before sending next message
-            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              this.logger.error('Data channel closed while configuring');
-              this._updateUI('error');
-              return;
-            }
-            
-            // Send initial user message
-            console.log('Voice AI SDK: Sending initial user message');
+            // Создаем и отправляем начальное сообщение
             const initialMessage = {
               type: 'conversation.item.create',
               item: {
@@ -1035,39 +998,20 @@
               }
             };
             
-            // Log user text to our API
+            // Логируем сообщение в API
             this._logTextToAPI('user', 'Begin the conversation');
             
-            // Send the message
+            // Отправляем сообщение
             await this.dataChannel.send(JSON.stringify(initialMessage));
             console.log('Voice AI SDK: Initial user message sent');
             
-            // Check if data channel is still open before sending next message
-            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              this.logger.error('Data channel closed while configuring');
-              this._updateUI('error');
-              return;
+            // Отправляем запрос на создание ответа
+            if (checkChannel()) {
+              const createResponse = { type: 'response.create' };
+              await this.dataChannel.send(JSON.stringify(createResponse));
+              console.log('Voice AI SDK: Response creation request sent');
             }
             
-            // 2. Request response creation
-            this.logger.debug('Requesting response creation');
-            console.log('Voice AI SDK: Requesting response creation');
-            const createResponse = {
-              type: 'response.create'
-            };
-            
-            // We need this await to ensure the message is sent and do not proceed to the next step until it's sent
-            await this.dataChannel.send(JSON.stringify(createResponse));
-            console.log('Voice AI SDK: Response creation request sent');
-
-            // Check if data channel is still open before sending final message
-            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-              this.logger.error('Data channel closed while configuring');
-              this._updateUI('error');
-              return;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
             console.log('Voice AI SDK: Data channel configuration completed');
           } catch (error) {
             this.logger.error('Error sending messages:', error);
@@ -2115,12 +2059,6 @@
           // Log user text to our API
           this._logTextToAPI('user', text);
           
-          // Add to message history
-          this.messages.push({
-            role: 'user',
-            content: text
-          });
-          
           // Call onMessage callback
           if (typeof this.config.onMessage === 'function') {
             this.config.onMessage({
@@ -2142,49 +2080,51 @@
       }
 
       /**
-       * Initialize the SDK
-       * @param {Object} config - Configuration options
-       * @returns {Promise<VoiceAI>} - The VoiceAI instance
+       * Initialize with config
+       * @param {Object} config - Configuration object
+       * @returns {Promise<void>}
        */
       async _initialize(config) {
-        try {
-          this.logger.log('Initializing Voice AI SDK');
-          
-          // Generate a unique session ID if not provided
-          this.sessionId = config.sessionId || `sdk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          this.logger.debug('Session ID:', this.sessionId);
-          
-          // Create UI elements
-          this._createUI();
-          
-          // Set initial state
-          this._updateUI('idle');
-          
-          // Initialize WebRTC
-          const webrtcInitialized = await this._initWebRTC();
-          
-          if (!webrtcInitialized) {
-            this.logger.error('Failed to initialize WebRTC');
-            this._updateUI('error');
-            return false;
-          }
-          
-          // Configure session
-          const sessionConfigured = await this._configureSession();
-          
-          if (!sessionConfigured) {
-            this.logger.error('Failed to configure session');
-            this._updateUI('error');
-            return false;
-          }
-          
-          this.logger.log('Voice AI SDK initialized successfully');
-          return true;
-        } catch (error) {
-          this.logger.error('Error initializing Voice AI SDK', error);
-          this._updateUI('error');
-          return false;
+        // Initialize logger
+        this.logger = new Logger({
+          debug: config.debug || false,
+          logger: config.logger || console
+        });
+        
+        this.logger.log('Initializing Voice AI SDK');
+        
+        this.config = {
+          ...this.defaultConfig,
+          ...config
+        };
+        
+        this.clientId = this.config.clientId || this._generateClientId();
+        this.logger.log('Client ID:', this.clientId);
+        
+        // Set session ID if provided in config
+        this.sessionId = this.config.sessionId || null;
+        
+        // Load session if available
+        await this._loadSession();
+        
+        // Validate client
+        const clientValid = await this._validateClient();
+        if (!clientValid) {
+          throw new Error('Client validation failed');
         }
+        
+        // Create UI if not in headless mode
+        if (!this.config.headless) {
+          this._createUI();
+        }
+        
+        // Register event listeners
+        this._registerEventListeners();
+        
+        // Register tool handlers
+        this._registerToolHandlers();
+        
+        this.logger.log('Voice AI SDK initialized successfully');
       }
     }
   

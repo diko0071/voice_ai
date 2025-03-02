@@ -87,7 +87,6 @@ The SDK supports various configuration options:
       voice: 'alloy', // OpenAI voice ID
       serverUrl: 'https://your-voice-service.com', // Custom server URL
       meetingUrl: 'https://calendly.com/your-company/meeting', // URL for booking meetings
-      instructions: 'You are a helpful voice assistant for our website.', // Custom instructions for the AI
       customStyles: {
         buttonColor: '#3a86ff',
         textColor: '#333333',
@@ -134,7 +133,6 @@ The SDK accepts the following configuration parameters:
 - `theme`: (Optional) UI theme ('light', 'dark', 'brand')
 - `language`: (Optional) Language for the UI (default: 'en')
 - `voice`: (Optional) OpenAI voice ID (default: 'alloy')
-- `instructions`: (Optional) The agent instructions
 - `customStyles`: (Optional) Custom styling options
 - `onReady`: (Optional) Callback when the SDK is ready
 - `onStart`: (Optional) Callback when a session starts
@@ -172,7 +170,6 @@ The SDK communicates with the following server endpoints:
   - `voice`: (Optional) The voice to use (default: 'alloy')
 - **Response**:
   - `answer`: The WebRTC answer from OpenAI
-  - `instructions`: The agent instructions
 
 ## Customization
 

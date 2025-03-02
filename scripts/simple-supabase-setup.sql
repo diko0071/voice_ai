@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS text_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Add check constraint for type column
+ALTER TABLE IF EXISTS text_logs ADD CONSTRAINT text_logs_type_check CHECK (type IN ('user', 'assistant', 'error'));
+
 -- Create index for quick searching
 CREATE INDEX IF NOT EXISTS idx_text_logs_session_id ON text_logs(session_id);
 

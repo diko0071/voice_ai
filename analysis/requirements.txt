@@ -20,6 +20,9 @@ librosa>=0.10.0
 # Environment variables
 python-dotenv>=1.0.0
 
+# Supabase API
+supabase>=2.0.0
+
 # Development tools
 pytest>=7.3.1
 black>=23.3.0

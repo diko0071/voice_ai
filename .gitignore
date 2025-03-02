@@ -57,6 +57,12 @@ voice-ai-debug.log
 # Logs
 /logs
 
+# Data files
+# Ignore all files in analysis/data directory
+analysis/data/**
+# But don't ignore files with .forgit suffix (explicitly marked for git)
+!analysis/data/**/*.forgit.*
+
 # Python
 __pycache__/
 *.py[cod]

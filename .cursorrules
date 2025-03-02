@@ -22,7 +22,9 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
   - `README.md` - Analysis documentation
   - `requirements.txt` - Python dependencies
   - `notebooks/` - Jupyter notebooks for analysis
-  - `data/` - Data files for analysis
+  - `data/` - Data files for analysis (all data files must be stored ONLY here, not in root)
+    - Files with `.forgit` suffix (e.g., `example.forgit.csv`) are committed to Git
+    - All other files are ignored by Git
   - `scripts/` - Python scripts for analysis
 - `lib/` - Utility libraries
   - `storage/` - Storage utilities
@@ -45,8 +47,6 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 - `scripts/` - Utility scripts
   - `simple-supabase-setup.sql` - Supabase setup script (required SQL setup for tables and permissions)
   - `deploy-sdk.sh` - SDK deployment script
-- `data/` - Data files
-  - `text/` - Text data
 - `tests/` - Test files
 - `dist/` - Distribution files (in gitignore, but shown for reference)
   - `sdk/` - Compiled SDK files
@@ -107,4 +107,9 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 6. Jupyter notebooks are stored in plain text format (`.py` files) with cell markers `# %%`:
    - This format is compatible with VS Code's Jupyter extension
    - Allows for better version control and diff viewing
-   - To run these notebooks, use VS Code's "Run Cell" feature or convert to `.ipynb` format if needed 
+   - To run these notebooks, use VS Code's "Run Cell" feature or convert to `.ipynb` format if needed
+7. Data files:
+   - ALL data files must be stored ONLY in `analysis/data/` directory
+   - NEVER create data files in the root directory
+   - All files in `analysis/data/` are ignored by Git by default
+   - To include a file in Git, add `.forgit` suffix before extension (e.g., `important_data.forgit.csv`) 

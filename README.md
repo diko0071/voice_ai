@@ -45,7 +45,7 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
     - `voice-ai-styles.css` - SDK styles
 - `scripts/` - Utility scripts
   - `deploy-sdk.sh` - SDK deployment script
-  - `supabase-setup.sql` - SQL script for Supabase setup
+  - `simple-supabase-setup.sql` - SQL script for Supabase setup (required for tables and permissions)
 - `tests/` - Test files
 - `dist/` - Distribution files (in gitignore, but shown for reference)
   - `sdk/` - Compiled SDK files

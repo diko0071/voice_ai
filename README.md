@@ -77,7 +77,7 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 
 ## Setup
 
-### 1. Environment Variables
+### 1. Environment Variables - **REQUIRED FIRST STEP**
 Create `.env.local` from `.env.local.example` and add your API keys:
 ```
 # OpenAI API Key
@@ -87,6 +87,8 @@ NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+**IMPORTANT**: This step is absolutely necessary before using ANY functionality in this repository. Both the main web application AND the analysis tools require these environment variables to be properly set.
 
 ### 2. Supabase Setup
 1. Create a Supabase project at [supabase.com](https://supabase.com)
@@ -233,6 +235,12 @@ npm test
 ```
 
 Tests are automatically run on GitHub Actions for every pull request and push to the main branch. The test status is displayed in the badge at the top of this README.
+
+## Python Analysis Setup
+
+**PREREQUISITE**: Before using any analysis tools, make sure you have created the `.env.local` file from `.env.local.example` as described in the Setup section above. The analysis tools require access to the same environment variables.
+
+1. All Python dependencies must be added to `analysis/requirements.txt`, not installed globally
 
 ## Learn More
 

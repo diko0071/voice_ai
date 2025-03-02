@@ -73,7 +73,11 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 5. SDK enables integration on any website
 
 ## Setup
-1. Create `.env.local` from example
+1. Create `.env.local` from `.env.local.example` - **REQUIRED FIRST STEP**
+   - Copy the `.env.local.example` file to `.env.local`
+   - Fill in your real API keys and secrets in the `.env.local` file
+   - This step is **absolutely necessary** before using ANY functionality in this repository
+   - Both the main web application AND the analysis tools require these environment variables
 2. Add OpenAI API key and client configuration
 3. Set up Supabase by executing the SQL in `scripts/simple-supabase-setup.sql` in your Supabase SQL editor
 4. Run `npm run dev`
@@ -105,6 +109,7 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
    # Access the same environment variables used by the main app
    openai_api_key = get_env_var("NEXT_PUBLIC_OPENAI_API_KEY")
    ```
+   **IMPORTANT**: This requires that you have created the `.env.local` file as described in the main Setup section above
 6. Jupyter notebooks are stored in plain text format (`.py` files) with cell markers `# %%`:
    - This format is compatible with VS Code's Jupyter extension
    - Allows for better version control and diff viewing

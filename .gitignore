@@ -50,7 +50,6 @@ voice-ai-debug.log
 
 # IDE
 .idea
-.vscode
 
 # Temporary files
 /temp

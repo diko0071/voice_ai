@@ -41,15 +41,15 @@ print(f"Successfully connected to Supabase at: {supabase_url}")
 # %% [markdown]
 # ## Retrieving Logs from the `text_logs` Table
 #
-# Now, let's retrieve the last 100 rows from the `text_logs` table.
+# Now, let's retrieve the first 30 rows from the `text_logs` table.
 
 # %%
-# Query the text_logs table for the last 100 entries
+# Query the text_logs table for the first 30 entries (oldest records)
 response = (
     supabase.table("text_logs")
     .select("*")
-    .order("created_at", desc=True)
-    .limit(100)
+    .order("created_at", desc=False)  # Sort by ascending order (oldest first)
+    .limit(30)
     .execute()
 )
 

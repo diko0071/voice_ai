@@ -18,6 +18,12 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
       - `voice/` - Voice processing endpoints
         - `process/` - Voice processing
         - `text-log/` - Text logging
+- `analysis/` - Data analysis tools and resources
+  - `README.md` - Analysis documentation
+  - `requirements.txt` - Python dependencies
+  - `notebooks/` - Jupyter notebooks for analysis
+  - `data/` - Data files for analysis
+  - `scripts/` - Python scripts for analysis
 - `lib/` - Utility libraries
   - `storage/` - Storage utilities
   - `supabase.ts` - Supabase client
@@ -68,5 +74,37 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
 ## Setup
 1. Create `.env.local` from example
 2. Add OpenAI API key and client configuration
-3. Run `npm run dev`
-4. Open http://localhost:3000 
+3. Set up Supabase by executing the SQL in `scripts/simple-supabase-setup.sql` in your Supabase SQL editor
+4. Run `npm run dev`
+5. Open http://localhost:3000 
+
+## Python Analysis Setup
+1. All Python dependencies must be added to `analysis/requirements.txt`, not installed globally
+2. Create a virtual environment in the analysis directory:
+   ```bash
+   cd analysis
+   python -m venv .venv
+   source .venv/bin/activate  # On Unix/macOS
+   # or
+   .venv\Scripts\activate     # On Windows
+   ```
+3. Install dependencies from requirements.txt:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. To add new dependencies, update `requirements.txt` and reinstall:
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. Environment variables from the root `.env.local` file can be accessed in Python code:
+   ```python
+   # In any Python script or notebook
+   from env_loader import get_env_var
+   
+   # Access the same environment variables used by the main app
+   openai_api_key = get_env_var("NEXT_PUBLIC_OPENAI_API_KEY")
+   ```
+6. Jupyter notebooks are stored in plain text format (`.py` files) with cell markers `# %%`:
+   - This format is compatible with VS Code's Jupyter extension
+   - Allows for better version control and diff viewing
+   - To run these notebooks, use VS Code's "Run Cell" feature or convert to `.ipynb` format if needed 

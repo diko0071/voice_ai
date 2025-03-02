@@ -91,7 +91,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 2. Supabase Setup
 1. Create a Supabase project at [supabase.com](https://supabase.com)
 2. Get your project URL and anon key from the project settings
-3. Run the SQL script in `scripts/supabase-setup.sql` in the Supabase SQL editor to create the necessary tables and indexes
+3. Run the SQL script in `scripts/simple-supabase-setup.sql` in the Supabase SQL editor to create the necessary tables and indexes
+   - This script creates the required tables (`text_logs` and `sessions`)
+   - Sets up indexes for efficient querying
+   - Configures Row Level Security (RLS) policies for proper access control
+   - **Important**: This step must be completed before using the application with Supabase
 
 ### 3. Install Dependencies
 ```bash

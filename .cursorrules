@@ -22,6 +22,7 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
   - `README.md` - Analysis documentation
   - `requirements.txt` - Python dependencies
   - `notebooks/` - Jupyter notebooks for analysis
+    - `supabase_example.py` - Working example of Supabase connection and data retrieval
   - `data/` - Data files for analysis (all data files must be stored ONLY here, not in root)
     - Files with `.forgit` suffix (e.g., `example.forgit.csv`) are committed to Git
     - All other files are ignored by Git
@@ -113,3 +114,8 @@ Next.js app with voice commands via WebRTC and OpenAI. Includes JavaScript SDK f
    - NEVER create data files in the root directory
    - All files in `analysis/data/` are ignored by Git by default
    - To include a file in Git, add `.forgit` suffix before extension (e.g., `important_data.forgit.csv`) 
+8. Supabase connection:
+   - For examples of connecting to Supabase, refer to `analysis/notebooks/supabase_example.py`
+   - This notebook contains a working example of how to connect to Supabase and retrieve data from the `text_logs` table
+   - You can create new IPython notebooks in the same directory to perform your own analysis
+   - The example loads the first 30 records from the `text_logs` table, sorted by creation date (oldest first) 

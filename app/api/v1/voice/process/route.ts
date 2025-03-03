@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateClient } from '@/lib/security';
 import { OpenAIWebRTCSession } from '@/lib/openai-webrtc';
-import { deleteSession, getSession, sessionExists } from '@/lib/sessions';
-import { agentInstructions } from '@/prompts/agent-instructions';
-import { getOpenAISession, createOpenAISession } from '@/lib/openai-sessions';
+import { sessionExists } from '@/lib/sessions';
 import { logger } from '@/lib/logger';
 import { getStorage, StorageType } from '@/lib/storage';
 
@@ -34,9 +32,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
     
-    // Получаем инструкции напрямую, без связи с клиентом
-    const instructions = agentInstructions;
-    logger.log('Using agent instructions', { length: instructions.length });
+    logger.log('Using builtin agent instructions from OpenAIWebRTCSession');
     
     // Загружаем историю сообщений напрямую из хранилища, без связи с клиентом
     let messageHistory: any[] = [];
@@ -76,10 +72,8 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Создаем WebRTC сессию с инструкциями и историей сообщений
     logger.log('Creating WebRTC session with local data', {
       sessionId,
-      hasInstructions: !!instructions,
       messageHistoryCount: messageHistory.length
     });
     
@@ -87,8 +81,7 @@ export async function POST(request: NextRequest) {
       openaiKey, 
       sessionId, 
       clientId, 
-      voice || 'alloy', 
-      instructions,
+      voice || 'alloy',
       messageHistory
     );
     

@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { buildAgentInstructions } from '@/prompts/agent-instructions';
 
 export class OpenAIWebRTCSession {
   private apiKey: string;
@@ -6,7 +7,6 @@ export class OpenAIWebRTCSession {
   private clientId: string;
   private isActive: boolean = false;
   private voice: string;
-  private instructions: string;
   private messageHistory: any[] = [];
   private realtimeSessionId: string | null = null;
 
@@ -15,14 +15,12 @@ export class OpenAIWebRTCSession {
     sessionId: string, 
     clientId: string, 
     voice: string = 'alloy',
-    instructions: string = '',
     messageHistory: any[] = []
   ) {
     this.apiKey = apiKey;
     this.sessionId = sessionId;
     this.clientId = clientId;
     this.voice = voice;
-    this.instructions = instructions;
     this.messageHistory = messageHistory;
     console.log(`[OpenAIWebRTCSession] Created new session: ${sessionId} for client: ${clientId} with voice: ${voice}`);
     if (messageHistory && messageHistory.length > 0) {
@@ -51,26 +49,24 @@ export class OpenAIWebRTCSession {
       const model = "gpt-4o-realtime-preview-2024-12-17";
       
       logger.log('Creating OpenAI Realtime session with configuration', { sessionId: this.sessionId });
-      console.log(`[OpenAIWebRTCSession] Creating Realtime session with configuration for: ${this.sessionId}`);
       
-      // Format message history for instructions if available
-      let formattedInstructions = this.instructions;
+      // Format message history for instructions
+      let messageHistoryText = '';
       if (this.messageHistory && this.messageHistory.length > 0) {
-        const userMessages = this.messageHistory.filter(m => m.type === 'user').length;
-        const assistantMessages = this.messageHistory.filter(m => m.type === 'assistant').length;
+        logger.log('Formatting message history', { 
+          sessionId: this.sessionId,
+          messageCount: this.messageHistory.length,
+          userMessages: this.messageHistory.filter(m => m.type === 'user').length,
+          assistantMessages: this.messageHistory.filter(m => m.type === 'assistant').length
+        });
         
-        console.log(`[OpenAIWebRTCSession] Formatting message history - User: ${userMessages}, Assistant: ${assistantMessages}`);
-        
-        let messageHistoryText = '\n\n<conversation-history>';
-        for (const message of this.messageHistory) {
+        messageHistoryText = this.messageHistory.map(message => {
           const role = message.type === 'user' ? 'user' : 'assistant';
-          messageHistoryText += `\n  <message role="${role}">${message.text}</message>`;
-        }
-        messageHistoryText += '\n</conversation-history>\n\nPlease continue the conversation based on the previous context.';
-        
-        formattedInstructions += messageHistoryText;
-        console.log(`[OpenAIWebRTCSession] Added ${this.messageHistory.length} messages to instructions`);
+          return `<message role="${role}">${message.text}</message>`;
+        }).join('');
       }
+      
+      const formattedInstructions = buildAgentInstructions(messageHistoryText);
       
       // Create session with full configuration
       const sessionResponse = await fetch(`${baseUrl}/realtime/sessions`, {
@@ -120,28 +116,18 @@ export class OpenAIWebRTCSession {
           statusText: sessionResponse.statusText,
           error: errorText 
         });
-        console.error(`[OpenAIWebRTCSession] OpenAI session creation error: ${sessionResponse.status} ${sessionResponse.statusText}`);
-        console.error(`[OpenAIWebRTCSession] Error details: ${errorText}`);
         throw new Error(`OpenAI session creation error: ${sessionResponse.status} ${sessionResponse.statusText}`);
       }
       
-      // Parse session response
+      // Parse session response and establish WebRTC connection
       const sessionData = await sessionResponse.json();
       this.realtimeSessionId = sessionData.id;
-      console.log(`[OpenAIWebRTCSession] Created Realtime session: ${this.realtimeSessionId}`);
-      console.log(`[OpenAIWebRTCSession] Session configuration applied successfully`);
-      
-      // Now establish WebRTC connection using the ephemeral token from session creation
       const ephemeralToken = sessionData.client_secret.value;
       
-      logger.log('Sending offer to OpenAI using ephemeral token', { 
+      logger.log('Session created, sending WebRTC offer to OpenAI', { 
         sessionId: this.sessionId, 
         realtimeSessionId: this.realtimeSessionId 
       });
-      
-      console.log(`[OpenAIWebRTCSession] Sending offer to OpenAI for session: ${this.sessionId}`);
-      console.log(`[OpenAIWebRTCSession] Using ephemeral token from session creation`);
-      console.log(`[OpenAIWebRTCSession] SDP offer: ${clientOffer.sdp?.substring(0, 100)}...`);
       
       const response = await fetch(`${baseUrl}/realtime?session_id=${this.realtimeSessionId}`, {
         method: "POST",
@@ -159,31 +145,30 @@ export class OpenAIWebRTCSession {
           statusText: response.statusText,
           error: errorText 
         });
-        console.error(`[OpenAIWebRTCSession] OpenAI API error: ${response.status} ${response.statusText}`);
-        console.error(`[OpenAIWebRTCSession] Error details: ${errorText}`);
         throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
       }
       
-      // Get SDP answer from OpenAI
+      // Get SDP answer from OpenAI and create answer for client
       const sdpAnswer = await response.text();
-      console.log(`[OpenAIWebRTCSession] Received SDP answer from OpenAI: ${sdpAnswer.substring(0, 100)}...`);
-      
-      // Create answer for client
-      const answer: RTCSessionDescriptionInit = {
-        type: 'answer',
-        sdp: sdpAnswer
-      };
+      logger.log('Received SDP answer from OpenAI', { 
+        sessionId: this.sessionId,
+        realtimeSessionId: this.realtimeSessionId 
+      });
       
       logger.log('WebRTC connection established with OpenAI', { 
         sessionId: this.sessionId,
         realtimeSessionId: this.realtimeSessionId
       });
-      console.log(`[OpenAIWebRTCSession] WebRTC connection established with OpenAI for session: ${this.sessionId}`);
       
-      return answer;
+      return {
+        type: 'answer',
+        sdp: sdpAnswer
+      };
     } catch (error) {
-      logger.error('Failed to process offer', error);
-      console.error(`[OpenAIWebRTCSession] Failed to process offer for session: ${this.sessionId}`, error);
+      logger.error('Failed to process offer', { 
+        sessionId: this.sessionId, 
+        error 
+      });
       throw error;
     }
   }

@@ -61,12 +61,12 @@ export class OpenAIWebRTCSession {
         
         console.log(`[OpenAIWebRTCSession] Formatting message history - User: ${userMessages}, Assistant: ${assistantMessages}`);
         
-        let messageHistoryText = '\n\n<conversation_history>';
+        let messageHistoryText = '\n\n<conversation-history>';
         for (const message of this.messageHistory) {
           const role = message.type === 'user' ? 'user' : 'assistant';
           messageHistoryText += `\n  <message role="${role}">${message.text}</message>`;
         }
-        messageHistoryText += '\n</conversation_history>\n\nPlease continue the conversation based on the previous context.';
+        messageHistoryText += '\n</conversation-history>\n\nPlease continue the conversation based on the previous context.';
         
         formattedInstructions += messageHistoryText;
         console.log(`[OpenAIWebRTCSession] Added ${this.messageHistory.length} messages to instructions`);
